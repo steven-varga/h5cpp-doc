@@ -425,8 +425,7 @@ object  := [ h5::ocpl_t                           | h5::ocpyl_t ]
 ```
 
 
-
-
+## File Operations
 #### [File Creation Property List][1001]
 ```cpp
 // you may pass CAPI property list descriptors daisy chained with '|' operator 
@@ -434,7 +433,6 @@ auto fd = h5::create("002.h5", H5F_ACC_TRUNC,
 		h5::file_space_page_size{4096} | h5::userblock{512},  // file creation properties
 		h5::fclose_degree_weak | h5::fapl_core{2048,1} );     // file access properties
 ```
-
 
 * [`h5::userblock{hsize_t}`][1001] sets the user block size of a file creation property list
 * [`h5::sizes{size_t,size_t}`][1002] Sets the byte size of the offsets and lengths used to address objects in an HDF5 file.
@@ -490,7 +488,7 @@ h5::fapl_t fapl = h5::fclose_degree_weak | h5::fapl_core{2048,1} | h5::core_writ
 * **`h5::fapl_rest_vol`** or to request KITA/RestVOL services both flags are interchangeable you only need to specify one of them follow [instructions:][701] to setup RestVOL, once the required modules are included
 * **`h5::kita`** same as above
 
-
+## Group Operations
 #### [Group Creation Property List][1100]
 
 * [`h5::local_heap_size_hint{size_t}`][1101] Specifies the anticipated maximum size of a local heap.
@@ -502,7 +500,7 @@ h5::fapl_t fapl = h5::fclose_degree_weak | h5::fapl_core{2048,1} | h5::core_writ
 * [`local_heap_size_hint{hbool_t is_collective}`][1201] Sets metadata I/O mode for read operations to collective or independent (default).
 
 
-
+## Link Operations
 #### [Link Creation Property List][1300]
 * [`h5::char_encoding{H5T_cset_t}`][1301] Sets the character encoding used to encode link and attribute names. <br/>
 **Flags:** `h5::utf8`, `h5::ascii`
@@ -516,6 +514,7 @@ h5::fapl_t fapl = h5::fclose_degree_weak | h5::fapl_core{2048,1} | h5::core_writ
 * [`h5::elink_acc_flags{unsigned}`][1403] Sets the external link traversal file access flag in a link access property list.<br/>
 **Flags:** 	`h5::acc_rdwr`, `h5::acc_rdonly`, `h5::acc_default`
 
+## Dataset Operations
 #### [Dataset Creation Property List][1500]
 **Example:**
 ```cpp
@@ -538,77 +537,41 @@ h5::dcpl_t dcpl = h5::chunk{1,4,5} | h5::deflate{4} | h5::layout_compact | h5::d
 * [`h5::nbit`][1510] Sets up the use of the N-Bit filter.
 * [`h5::shuffle`][1512] Sets up use of the shuffle filter.
 
-#### [Dataset Access Property List][301]
+#### [Dataset Access Property List][1600]
 In addition to CAPI properties, a custom `high_throughput` property is added, to request alternative, simpler but more efficient pipeline.
 
-* `h5::high_throughput` **Sets high throughput H5CPP custom filter chain.** HDF5 library comes with a complex, feature rich environment to index data-sets by strides, blocks, or even by individual coordinates within chunk boundaries - less fortunate the performance impact on throughput.  Setting this flag will replace the built in filter chain with a simpler one (without complex indexing features), then delegates IO calls to the recently introduced [HDF5 Optimized API][400] calls.
+* **`h5::high_throughput`** Sets high throughput H5CPP custom filter chain. HDF5 library comes with a complex, feature rich environment to index data-sets by strides, blocks, or even by individual coordinates within chunk boundaries - less fortunate the performance impact on throughput.  Setting this flag will replace the built in filter chain with a simpler one (without complex indexing features), then delegates IO calls to the recently introduced [HDF5 Optimized API][400] calls.<br/>
 
 	The implementation is based on BLAS level 3 blocking algorithm, supports data access only at chunk boundaries, edges are handled as expected. For maximum throughput place edges at chunk boundaries.
-
 	**Note:** This feature and indexing within a chunk boundary such as `h5::stride` is mutually exclusive.
 
+* [`h5::chunk_cache{size_t rdcc_nslots, size_t rdcc_nbytes, double rdcc_w0}`][1601] Sets the raw data chunk cache parameters.
+* [`all_coll_metadata_ops{hbool_t is_collective}`][1602] Sets metadata I/O mode for read operations to collective or independent (default).
+* [`h5::efile_prefix{const char*}`][1603] Sets the external dataset storage file prefix in the dataset access property list.
+* [*`h5::append_flush`*][not-implemented] N/A, H5CPP comes with custom high performance packet table implementation
+* [`h5::virtual_view{H5D_vds_view_t}`][1604] Sets the view of the virtual dataset (VDS) to include or exclude missing mapped elements.
+* [`h5::virtual_printf_gap{hsize_t}`][1605] Sets the maximum number of missing source files and/or datasets with the printf-style names when getting the extent of an unlimited virtual dataset.
 
-* `h5::chunk_cache{size_t, size_t, double}` **Sets the raw data chunk cache parameters.** H5Pset_chunk_cache is used to adjust the chunk cache parameters on a per-dataset basis, as opposed to a global setting for the file using H5Pset_cache. The optimum chunk cache parameters may vary widely with different data layout and access patterns, so for optimal performance they must be set individually for each dataset. It may also be beneficial to reduce the size of the chunk cache for datasets whose performance is not important in order to save memory space.<br/>
-H5Pset_chunk_cache sets the number of elements, the total number of bytes, and the preemption policy value in the raw data chunk cache on a dataset access property list. After calling this function, the values set in the property list will override the values in the file's file access property list.
+#### [Dataset Transfer Property List][1700]
 
-	The raw data chunk cache inserts chunks into the cache by first computing a hash value using the address of a chunk, then using that hash value as the chunk's index into the table of cached chunks. The size of this hash table, i.e., and the number of possible hash values, is determined by the rdcc_nslots parameter. If a different chunk in the cache has the same hash value, this causes a collision, which reduces efficiency. If inserting the chunk into cache would cause the cache to be too big, then the cache is pruned according to the rdcc_w0 parameter.
+* [`h5::buffer{size_t, void*, void*}`][1701] Sets type conversion and background buffers.
+* [`h5::edc_check{H5Z_EDC_t}`][1702] Sets whether to enable error-detection when reading a dataset.
+* [`h5::filter_callback{H5Z_filter_func_t func, void *op_data}`][1703] Sets user-defined filter callback function.
+* [`h5::data_transform{const char *expression}`][1704] Sets a data transform expression.
+* [`h5::type_conv_cb{H5T_conv_except_func_t func, void *op_data}`][1705] Sets user-defined datatype conversion callback function.
+* [`h5::hyper_vector_size{size_t vector_size}`][1706] Sets number of I/O vectors to be read/written in hyperslab I/O.
+* [`h5::btree_ratios{double left, double middle, double right}`][1707] Sets B-tree split ratios for a dataset transfer property list.
+* [`h5::vlen_mem_manager{H5MM_allocate_t alloc, void *alloc_info, H5MM_free_t free, void *free_info}`][1708]
+* [`h5::dxpl_mpiio{H5FD_mpio_xfer_t xfer_mode}`][1709] Sets data transfer mode <br/>
+**Flags:** `h5::collective`, `h5::independent`
+* [`h5::dxpl_mpiio_chunk_opt{H5FD_mpio_chunk_opt_t opt_mode}`][1710] Sets a flag specifying linked-chunk I/O or multi-chunk I/O.<br/>
+**Flags:** `h5::chunk_one_io`, `h5::chunk_multi_io`
+* [`h5::dxpl_mpiio_chunk_opt_num{unsigned num_chunk_per_proc}`][1711] Sets a numeric threshold for linked-chunk I/O.
+* [`h5::dxpl_mpiio_chunk_opt_ratio{unsigned percent_proc_per_chunk}`][1712] Sets a ratio threshold for collective I/O.
+* [`h5::dxpl_mpiio_collective_opt{H5FD_mpio_collective_opt_t opt_mode}`][1713] Sets a flag governing the use of independent versus collective I/O.<br/>
+**Flags:** `h5::collective_io`, `h5::individual_io`
 
-* `h5::efile_prefix{const char*}` **Sets the external dataset storage file prefix in the dataset access property list.** H5Pset_efile_prefix sets the prefix used to locate raw data files for a dataset that uses external storage. This prefix can provide either an absolute path or a relative path to the external files.
-H5Pset_efile_prefix is used in conjunction with H5Pset_external to control the behavior of the HDF5 Library when searching for the raw data files associated with a dataset that uses external storage:<br/>
-	* The default behavior of the library is to search for the dataset’s external storage raw data files in the same directory as the HDF5 file which contains the dataset.
-	* If the prefix is set to an absolute path, the target directory will be searched for the dataset’s external storage raw data files.
-	* If the prefix is set to a relative path, the target directory, relative to the current working directory, will be searched for the dataset’s external storage raw data files.
-	* If the prefix is set to a relative path that begins with the special token ${ORIGIN}, that directory, relative to the HDF5 file containing the dataset, will be searched for the dataset’s external storage raw data files
-
-	The HDF5_EXTFILE_PREFIX environment variable can be used to override the above behavior (the environment variable supersedes the API call). Setting the variable to a path string and calling H5Dcreate or H5Dopen is the equivalent of calling H5Pset_efile_prefix and calling the same create or open function. The environment variable is checked at the time of the create or open action and copied so it can be safely changed after the H5Dcreate or H5Dopen call.
-
-	Calling H5Pset_efile_prefix with prefix set to NULL or the empty string returns the search path to the default. The result would be the same as if H5Pset_efile_prefix had never been called.
-
-	**Notes:** If the external file prefix is not an absolute path and the HDF5 file is moved, the external storage files will also need to be moved so they can be accessed at the new location.
-As stated above, the use of the HDF5_EXTFILE_PREFIX environment variable overrides any property list setting. H5Pset_efile_prefix and H5Pget_efile_prefix, being property functions, set and retrieve only the property list setting; they are unaware of the environment variable.
-
-	On Windows, the prefix must be an ASCII string since the Windows standard C library’s I/O functions cannot handle UTF-8 file names
-
-* `h5::virtual_view{H5D_vds_view_t}` **Sets the view of the virtual dataset (VDS) to include or exclude missing mapped elements.** H5Pset_virtual_view takes the access property list for the virtual dataset, dapl_id, and the flag, view, and sets the VDS view according to the flag value. If view is set to H5D_VDS_FIRST_MISSING, the view includes all data before the first missing mapped data. This setting provides a view containing only the continuous data starting with the dataset’s first data element. Any break in continuity terminates the view. If view is set to H5D_VDS_LAST_AVAILABLE, the view includes all available mapped data. Missing mapped data is filled with the fill value set in the VDS creation property list.
-
-* `h5::virtual_printf_gap{hsize_t}` **Sets the maximum number of missing source files and/or datasets with the printf-style names when getting the extent of an unlimited virtual dataset.** 5Pset_virtual_printf_gap sets the access property list for the virtual dataset, dapl_id, to instruct the library to stop looking for the mapped data stored in the files and/or datasets with the printf-style names after not finding gap_size files and/or datasets. The found source files and datasets will determine the extent of the unlimited virtual dataset with the printf-style mappings.
-	Consider the following examples where the regularly spaced blocks of a virtual dataset are mapped to datasets with the names d-1, d-2, d-3, ..., d-N, ... :
-
-	* If the dataset d-2 is missing and gap_size is set to 0, then the virtual dataset will contain only data found in d-1.
-	* If d-2 and d-3 are missing and gap_size is set to 2, then the virtual dataset will contain the data from d-1, d-3, ..., d-N, ... .  The blocks that are mapped to d-2 and d-3 will be filled according to the virtual dataset’s fill value setting.
-
-
-
-#### [Dataset Transfer Property List][305]
-
-* `h5::buffer{size_t, void*, void*}` **Sets type conversion and background buffers.** Given a dataset transfer property list, H5Pset_buffer sets the maximum size for the type conversion buffer and background buffer and optionally supplies pointers to application-allocated buffers. If the buffer size is smaller than the entire amount of data being transferred between the application and the file, and a type conversion buffer or background buffer is required, then strip mining will be used.
-
-	Note that there are minimum size requirements for the buffer. Strip mining can only break the data up along the first dimension, so the buffer must be large enough to accommodate a complete slice that encompasses all of the remaining dimensions. For example, when strip mining a 100x200x300 hyperslab of a simple data space, the buffer must be large enough to hold 1x200x300 data elements. When strip mining a 100x200x300x150 hyperslab of a simple data space, the buffer must be large enough to hold 1x200x300x150 data elements.
-
-	If tconv and/or bkg are null pointers, then buffers will be allocated and freed during the data transfer. The default value for the maximum buffer is 1 Mb.
-
-* `h5::edc_check{H5Z_EDC_t}` **Sets whether to enable error-detection when reading a dataset.** H5Pset_edc_check sets the dataset transfer property list plist to enable or disable error detection when reading data. Whether error detection is enabled or disabled is specified in the check parameter. Valid values are as follows:
-	* H5Z_ENABLE_EDC   (default)
-	* H5Z_DISABLE_EDC
-
-	The error detection algorithm used is the algorithm previously specified in the corresponding dataset creation property list. This function does not affect the use of error detection when writing data.
-	
-	**Note:** The initial error detection implementation, Fletcher32 checksum, supports error detection for chunked datasets only.
-	The Fletcher32 EDC checksum filter, set with H5Pset_fletcher32, was added in HDF5 Release 1.6.0. In the original implementation, however, the checksum value was calculated incorrectly on little-endian systems. The error was fixed in HDF5 Release 1.6.3.
-
-	As a result of this fix, an HDF5 Library of Release 1.6.0 through Release 1.6.2 cannot read a dataset created or written with Release 1.6.3 or later if the dataset was created with the checksum filter and the filter is enabled in the reading library. (Libraries of Release 1.6.3 and later understand the earlier error and comensate appropriately.)
-
-	**Work-around:** An HDF5 Library of Release 1.6.2 or earlier will be able to read a dataset created or written with the checksum filter by an HDF5 Library of Release 1.6.3 or later if the checksum filter is disabled for the read operation. This can be accomplished via an H5Pset_edc_check call with the value H5Z_DISABLE_EDC in the second parameter. This has the obvious drawback that the application will be unable to verify the checksum, but the data does remain accessible.
-
-* [`h5::filter_callback`](https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetFilterCallback) **Sets user-defined filter callback function**
-
-```cpp
-using filter_callback          = impl::dxpl_call< impl::dxpl_args<hid_t,H5Z_filter_func_t,void*>,H5Pset_filter_callback>;
-using data_transform           = impl::dxpl_call< impl::dxpl_args<hid_t,const char *>,H5Pset_data_transform>;
-using type_conv_cb             = impl::dxpl_call< impl::dxpl_args<hid_t,H5T_conv_except_func_t,void*>,H5Pset_type_conv_cb>;
-using hyper_vector_size        = impl::dxpl_call< impl::dxpl_args<hid_t,size_t>,H5Pset_hyper_vector_size>;
-using btree_ratios             = impl::dxpl_call< impl::dxpl_args<hid_t,double,double,double>,H5Pset_btree_ratios>;
-```
+## Misc Operations
 
 #### [Object Creation Property List][308]
 ```cpp
@@ -629,7 +592,7 @@ const static h5::copy_object expand_reference{H5O_COPY_EXPAND_REFERENCE_FLAG};
 const static h5::copy_object copy_without_attr{H5O_COPY_WITHOUT_ATTR_FLAG};
 const static h5::copy_object merge_commited_dtype{H5O_COPY_MERGE_COMMITTED_DTYPE_FLAG};
 ```
-#### MPI Parallel HDF5 related properties
+## MPI / Parallel Operations
 ```cpp
 using fapl_mpiio                 = impl::fapl_call< impl::fapl_args<hid_t,MPI_Comm, MPI_Info>,H5Pset_fapl_mpio>;
 using all_coll_metadata_ops      = impl::fapl_call< impl::fapl_args<hid_t,hbool_t>,H5Pset_all_coll_metadata_ops>;
@@ -886,7 +849,7 @@ In order to execute install  `google-pprof` and `kcachegrind`.
 [copy_elision]: https://en.cppreference.com/w/cpp/language/copy_elision
 [csr]: https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_row_(CSR,_CRS_or_Yale_format)
 [csc]: https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_column_(CSC_or_CCS)
-
+[not-implemented]: #not-implemented
 [1]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5I.html#Identify-IncRef
 [2]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5I.html#Identify-DecRef
 [3]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5I.html#Identify-GetRef
@@ -1003,6 +966,29 @@ In order to execute install  `google-pprof` and `kcachegrind`.
 [1511]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetScaleoffset
 [1512]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetShuffle
 [1513]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetSzip
+
+[1600]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#DatasetAccessPropFuncs
+[1601]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetChunkCache
+[1602]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetAllCollMetadataOps
+[1603]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetEfilePrefix
+[1604]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetVirtualView
+[1605]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetVirtualPrintfGap
+
+[1700]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#DatasetTransferPropFuncs
+[1701]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetBuffer
+[1702]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetEdcCheck
+[1703]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetFilterCallback
+[1704]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetDataTransform
+[1705]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetTypeConvCb
+[1706]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetHyperVectorSize
+[1707]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetBTreeRatios 
+[1708]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetVLMemManager
+[1709]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetDxplMpio
+[1710]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetDxplMpioChunkOpt
+[1711]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetDxplMpioChunkOptNum
+[1712]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetDxplMpioChunkOptRatio
+[1713]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetDxplMpioCollectiveOpt
+
 
 [601]: #file-creation-property-list
 [602]: #file-access-property-list
