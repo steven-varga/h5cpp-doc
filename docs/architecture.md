@@ -1,31 +1,35 @@
 
 # HDF5 Filesystem
 <p align='justify'>
-Within HDF5 container, objects are stored in either custom sized chunks or a single continuous dataset and can be referenced similarly as if it were a regular file system: a path separated by `/`. The collection of paths may be modelled as a tree (or graph), where the intermediate or non-leaf nodes are called groups `h5::gr_t`, and the leaf ones are the datasets `h5::ds_t`.
+Within the HDF5 container, datasets maybe stored in [compact, chunked or contiguous](#dataset-creation-property-list) layouts. The  stored datasets are referenced by strings separated with backslash character: `/`.
+The directory entries (non-leaf nodes) are called groups `h5::gr_t`, and the leaf nodes are the datasets `h5::ds_t` and named types `h5::dt_t`. Groups, datasets and named types can have `h5::att_t` attributes attached. At first glance the HDF5 appears as a regular file system.
 </p>
 <p align='justify'>
-The container sports an internal type system, as well as mechanism to store fixed length and variable length data. These features are automatically set in H5CPP by keeping track of object types, and element types at compile time.
-How data stored or retrieved from a container is controlled through property lists. To give you an example for a property: [`h5::gzip{9}`][604] sets compression to maximum level. The system differentiates between data access properties: `h5::dapl_t`, data transfer property lists: `h5::dxpl_t`, data control property lists `h5::dcpl_t`. You can get the full property list [from this link](#property-lists). </p>
+The container sports an internal type system, as well as function calls to store the fixed or variable length data. The funciton may be fine tuned through 
+ [property lists](#property-lists). To give an example [`h5::gzip{9}`][604] sets the data compression to maximum in the filter chain.</p> 
 
-#### Partial IO Access
+## Layouts
+#### Chunked Layout and Partial IO
 <p align='justify'>
-Datasets greater than core memory may be loaded by smaller blocks at a time. This type of access pattern is called `chunking` in HDF5 terminology and you can locate a chunk by specifying `h5::offset{...}`, `h5::count{...}` and `h5::stride{...}`.
-All these objects take an initializer list as arguments, for example this sets the coordinates to zero: `h5::offset{0,0,0}` for a rank 3 or cube dataset. Upto **rank 7** objects are supported.
+An economic way to access massive data sets is to break them into smaller blocks or chunks. While the CAPI supports complex selection of regions H5CPP restricts selection to a single strided block at a time. 
 
-`h5::stride` tells if you wish to select adjacent elements or you wish to skip `n`  along a dimension and I find it less useful for fast IO. In fact `h5::stride` can reduce IO bandwidth significantly and completely omitted from `h5::high_throughput` filtering pipeline.
-
-**NOTE:** partial IO is not available for attributes
+* `h5::offset{...}` takes coordinates up to rank 7, and is to specify the origin of data transfer
+* `h5::count{...}` to determine the size of hyper slab in each dimension
+* `h5::stride{...}` to skip given elements
+* `h5::block{...}` 
 </p>
 
-#### Single IO Access
-The simplest form of IO is to read a dataset entirely into memory, or write it to the disk. The upside is to reduce overhead when working with large amount of small size dataset. Indeed, when objects are saved in single IO op and no filtering is specified, H5CPP will choose this access pattern.  The downside of simplicity is lack of filtering.
+#### Contiguous Layout and IO Access: continuous layout
+The simplest form of IO is to read a dataset entirely into memory, or write it to the disk. The upside is to reduce overhead when working with large amount of small size dataset. Indeed, when objects are saved in single IO op and no filtering is specified, H5CPP will choose this access pattern.  The downside of simplicity is lack of filtering. This layout is handy for small datasets.
 
 
 #### Data Space
-is a way to tell the system how in-memory data mapped to file (or reverse). To give you an example, picture a block of data in consecutive memory that you wish to map into a 3D space on the file layout. Other than that the data space may be fixed size, or able to be extended to a definite or unlimited size along some dimension.
+is a way to tell the system how in-memory data mapped to file (or reverse). To give you an example picture a block of data in consecutive memory location that you wish to write to a cube shaped dataset. Other than that the data space may be fixed size, or able to be extended to a definite or unlimited size along some dimension.
 
 When working with supported objects, the in-memory dataspace is pre computed for you. And when passing raw pointers to IO operators, the filespace will determine the amount of memory used.
 
+* `h5::current_dims`
+* `h5::max_dims`
 
 #IO Operators
 <p align='justify'>
@@ -88,9 +92,7 @@ Property lists are: [`h5::fcpl_t`][601], [`h5::fapl_t`][602], [`h5::lcpl_t`][603
 
 **Example:** to create an HDF5 container, and a dataset within:
 ```cpp
-#include <h5cpp/core>
-	#include "your_data_definition.h"
-#include <h5cpp/io>
+#include <h5cpp/all>
 ...
 arma::mat M(2,3);
 h5::fd_t fd = h5::create("arma.h5",H5F_ACC_TRUNC);
@@ -424,6 +426,15 @@ type    := [              h5::tapl_t                            ]
 object  := [ h5::ocpl_t                           | h5::ocpyl_t ]
 ```
 
+#### Default Properties:
+set to  value (different from HDF5 CAPI):
+
+* `h5::default_lcpl =  h5::utf8 | h5::create_intermediate_group;`
+
+set to zero (same as HDF5 CAPI):
+
+* `h5::default_acpl`, `h5::default_dcpl`, `h5::default_dxpl`, `h5::default_fapl`,  `h5::default_fcpl`
+
 
 ## File Operations
 #### [File Creation Property List][1001]
@@ -439,6 +450,7 @@ auto fd = h5::create("002.h5", H5F_ACC_TRUNC,
 * [`h5::sym_k{unsigned,unsigned}`][1003] Sets the size of parameters used to control the symbol table nodes.
 * [`h5::istore_k{unsigned}`][1004] Sets the size of the parameter used to control the B-trees for indexing chunked dataset.
 * [`h5::file_space_page_size{hsize_t}`][1005] Sets the file space page size for a file creation property list.
+* [`h5::file_space_page_strategy{H5F_fspace_strategy_t strategy, hbool_t persist, hsize_t threshold}`][1010] Sets the file space handling strategy and persisting free-space values for a file creation property list. <br/>
 * [`h5::shared_mesg_nindexes{unsigned}`][1007] Sets number of shared object header message indexes.
 * [`h5::shared_mesg_index{unsigned,unsigned,unsigned}`][1008] Configures the specified shared object header message index.
 * [`h5::shared_mesg_phase_change{unsigned,unsigned}`][1009] Sets shared object header message storage phase change thresholds.
@@ -450,6 +462,7 @@ h5::fapl_t fapl = h5::fclose_degree_weak | h5::fapl_core{2048,1} | h5::core_writ
 			| h5::fapl_family{H5F_FAMILY_DEFAULT,0};
 			
 ```
+* [`h5::driver{hid_t new_driver_id, const void *new_driver_info}`][1055] Sets a file driver.<br/>
 * [`h5::fclose_degree{H5F_close_degree_t}`][1022] Sets the file close degree.<br/>
 	**Flags:** `h5::fclose_degree_weak`, `h5::fclose_degree_semi`, `h5::fclose_degree_strong`, `h5::fclose_degree_default`
 * [`h5::fapl_core{size_t increment, hbool_t backing_store}`][1023] Modifies the file access property list to use the H5FD_CORE driver.
@@ -465,7 +478,7 @@ h5::fapl_t fapl = h5::fclose_degree_weak | h5::fapl_core{2048,1} | h5::core_writ
 * [`h5::fapl_split{const char *meta_ext, hid_t meta_plist_id, const char *raw_ext, hid_t raw_plist_id}`][1032] Emulates the old split file driver.
 * [`h5::sec2`][1033] (flag) Sets the sec2 driver.
 * [`h5::stdio`][1034] (flag) Sets the standard I/O driver.
-* [`h5::windows`][1035] Not implemented on H5CPP
+* [`h5::windows`][1035] (flag) Sets the Windows I/O driver.
 * [`h5::file_image{void*,size_t}`][1036] Sets an initial file image in a memory buffer.
 * [`h5::file_image_callback{H5_file_image_callbacks_t *callbacks_ptr}`][1037] Sets the callbacks for working with file images.
 * [`h5::meta_block_size{hsize_t}`][1038] Sets the minimum metadata block size.
@@ -481,7 +494,7 @@ h5::fapl_t fapl = h5::fclose_degree_weak | h5::fapl_core{2048,1} | h5::core_writ
 * [`h5::mdc_log_options{const char*,hbool_t}`][1048] Sets metadata cache logging options.
 * [`h5::all_coll_metadata_ops{hbool_t}`][1049] Sets metadata I/O mode for read operations to collective or independent (default).
 * [`h5::coll_metadata_write{hbool_t}`][1050] Sets metadata write mode to collective or independent (default).
-* [`h5::gc_references{unsigned}`][1051] H5Pset_gc_references sets the flag for garbage collecting references for the file.
+* [`h5::gc_references{unsigned}`][1050] H5Pset_gc_references sets the flag for garbage collecting references for the file.
 * [`h5::small_data_block_size{hsize_t}`][1052] Sets the size of a contiguous block reserved for small data.
 * [`h5::libver_bounds {H5F_libver_t,H5F_libver_t}`][1053] Sets bounds on library versions, and indirectly format versions, to be used when creating objects.
 * [`h5::object_flush_cb{H5F_flush_cb_t,void*}`][1054] Sets a callback function to invoke when an object flush occurs in the file.
@@ -572,72 +585,39 @@ In addition to CAPI properties, a custom `high_throughput` property is added, to
 **Flags:** `h5::collective_io`, `h5::individual_io`
 
 ## Misc Operations
+#### [Object Creation Property List][1800]
+* [`h5::ocreate_intermediate_group{unsigned}`][1801] Sets tracking and indexing of attribute creation order.
+* [`h5::obj_track_times{hbool_t}`][1802] Sets the recording of times associated with an object.
+* [`h5::attr_phase_change{unsigned, unsigned}`][1803] Sets attribute storage phase change thresholds.
+* [`h5::attr_creation_order{unsigned}`][1804] Sets tracking and indexing of attribute creation order. <br/>
+**Flags:** `h5::crt_order_tracked`, `h5::crt_order_indexed`
 
-#### [Object Creation Property List][308]
-```cpp
-using ocreate_intermediate_group = impl::ocrl_call< impl::ocrl_args<hid_t,unsigned>,H5Pset_create_intermediate_group>;
-using obj_track_times            = impl::ocrl_call< impl::ocrl_args<hid_t,hbool_t>,H5Pset_obj_track_times>;
-using attr_phase_change          = impl::ocrl_call< impl::ocrl_args<hid_t,unsigned,unsigned>,H5Pset_attr_phase_change>;
-using attr_creation_order        = impl::ocrl_call< impl::ocrl_args<hid_t,unsigned>,H5Pset_attr_creation_order>;
-```
+#### [Object Copy Property List][1900]
+* [`h5::copy_object{unsigned}`][1901] Sets properties to be used when an object is copied. <br/>
+**Flags:** `h5::shallow_hierarchy`, `h5::expand_soft_link`, `h5::expand_ext_link`, `h5::expand_reference`, `h5::copy_without_attr`,
+`h5::merge_commited_dtype`
 
-#### [Object Copy Property List][309]
-```cpp
-using copy_object                = impl::ocpl_call< impl::ocpl_args<hid_t,unsigned>,H5Pset_copy_object>;
-using mcdt_search_cb             = impl::ocpl_call< impl::ocpl_args<hid_t,H5O_mcdt_search_cb_t,void*>,H5Pset_mcdt_search_cb>;
-const static h5::copy_object shallow_hierarchy{H5O_COPY_SHALLOW_HIERARCHY_FLAG};
-const static h5::copy_object expand_soft_link{H5O_COPY_EXPAND_SOFT_LINK_FLAG};
-const static h5::copy_object expand_ext_link{H5O_COPY_EXPAND_EXT_LINK_FLAG};
-const static h5::copy_object expand_reference{H5O_COPY_EXPAND_REFERENCE_FLAG};
-const static h5::copy_object copy_without_attr{H5O_COPY_WITHOUT_ATTR_FLAG};
-const static h5::copy_object merge_commited_dtype{H5O_COPY_MERGE_COMMITTED_DTYPE_FLAG};
-```
 ## MPI / Parallel Operations
-```cpp
-using fapl_mpiio                 = impl::fapl_call< impl::fapl_args<hid_t,MPI_Comm, MPI_Info>,H5Pset_fapl_mpio>;
-using all_coll_metadata_ops      = impl::fapl_call< impl::fapl_args<hid_t,hbool_t>,H5Pset_all_coll_metadata_ops>;
-using coll_metadata_write        = impl::fapl_call< impl::fapl_args<hid_t,hbool_t>,H5Pset_coll_metadata_write>;
-using gc_references              = impl::fapl_call< impl::fapl_args<hid_t,unsigned>,H5Pset_gc_references>;
-using small_data_block_size      = impl::fapl_call< impl::fapl_args<hid_t,hsize_t>,H5Pset_small_data_block_size>;
-using object_flush_cb            = impl::fapl_call< impl::fapl_args<hid_t,H5F_flush_cb_t,void*>,H5Pset_object_flush_cb>;
-
-using fapl_coll_metadata_ops     = impl::fapl_call< impl::fapl_args<hid_t,hbool_t>,H5Pset_all_coll_metadata_ops>; // file
-using gapl_coll_metadata_ops     = impl::gapl_call< impl::gapl_args<hid_t,hbool_t>,H5Pset_all_coll_metadata_ops>; // group 
-using dapl_coll_metadata_ops     = impl::gapl_call< impl::dapl_args<hid_t,hbool_t>,H5Pset_all_coll_metadata_ops>; // dataset
-using tapl_coll_metadata_ops     = impl::tapl_call< impl::tapl_args<hid_t,hbool_t>,H5Pset_all_coll_metadata_ops>; // type 
-using lapl_coll_metadata_ops     = impl::lapl_call< impl::lapl_args<hid_t,hbool_t>,H5Pset_all_coll_metadata_ops>; // link
-using aapl_coll_metadata_ops     = impl::gapl_call< impl::gapl_args<hid_t,hbool_t>,H5Pset_all_coll_metadata_ops>; // attribute
-
-using dxpl_mpiio                 = impl::dxpl_call< impl::dxpl_args<hid_t,H5FD_mpio_xfer_t>,H5Pset_dxpl_mpio>;
-using dxpl_mpiio_chunk_opt       = impl::dxpl_call< impl::dxpl_args<hid_t,H5FD_mpio_chunk_opt_t>,H5Pset_dxpl_mpio_chunk_opt>;
-using dxpl_mpiio_chunk_opt_num   = impl::dxpl_call< impl::dxpl_args<hid_t,unsigned>,H5Pset_dxpl_mpio_chunk_opt_num>;
-using dxpl_mpiio_chunk_opt_ratio = impl::dxpl_call< impl::dxpl_args<hid_t,unsigned>,H5Pset_dxpl_mpio_chunk_opt_ratio>;
-using dxpl_mpiio_collective_opt  = impl::dxpl_call< impl::dxpl_args<hid_t,H5FD_mpio_collective_opt_t>,H5Pset_dxpl_mpio_collective_opt>;
-//TODO; verify * -> ref?
-using dxpl_mpiio                 = impl::dxpl_call< impl::dxpl_args<hid_t,H5FD_mpio_xfer_t>,H5Pset_dxpl_mpio>;
-
-using mpiio = fapl_mpiio;
-const static h5::dxpl_mpiio collective{H5FD_MPIO_COLLECTIVE};
-const static h5::dxpl_mpiio independent{H5FD_MPIO_INDEPENDENT};
-```
-
-
-#### Default Properties
-```cpp
-const static h5::acpl_t acpl = static_cast<h5::acpl_t>( H5P_DEFAULT );
-const static h5::dcpl_t dcpl = static_cast<h5::dcpl_t>( H5P_DEFAULT);
-const static h5::dxpl_t dxpl = static_cast<h5::dxpl_t>( H5P_DEFAULT );
-const static h5::lcpl_t lcpl = h5::char_encoding{H5T_CSET_UTF8} | h5::create_intermediate_group{1};
-const static h5::fapl_t fapl = static_cast<h5::fapl_t>( H5P_DEFAULT );
-const static h5::fcpl_t fcpl = static_cast<h5::fcpl_t>( H5P_DEFAULT );
-
-const static h5::acpl_t default_acpl = static_cast<h5::acpl_t>( H5P_DEFAULT );
-const static h5::dcpl_t default_dcpl = static_cast<h5::dcpl_t>( H5P_DEFAULT );
-const static h5::dxpl_t default_dxpl = static_cast<h5::dxpl_t>( H5P_DEFAULT );
-const static h5::lcpl_t default_lcpl = h5::char_encoding{H5T_CSET_UTF8} | h5::create_intermediate_group{1};
-const static h5::fapl_t default_fapl = static_cast<h5::fapl_t>( H5P_DEFAULT );
-const static h5::fcpl_t default_fcpl = static_cast<h5::fcpl_t>( H5P_DEFAULT );
-```
+* [`h5::fapl_mpiio{MPI_Comm comm, MPI_Info info}`][1029] Stores MPI IO communicator information to the file access property list.
+* [`h5::all_coll_metadata_ops{hbool_t}`][1049] Sets metadata I/O mode for read operations to collective or independent (default).
+* [`h5::coll_metadata_write{hbool_t}`][1050] Sets metadata write mode to collective or independent (default).
+* [`h5::gc_references{unsigned}`][1051] H5Pset_gc_references sets the flag for garbage collecting references for the file.
+* [`h5::small_data_block_size{hsize_t}`][1052] Sets the size of a contiguous block reserved for small data.
+* [`h5::object_flush_cb{H5F_flush_cb_t,void*}`][1054] Sets a callback function to invoke when an object flush occurs in the file.
+* [`h5::fapl_coll_metadata_ops{hbool_t}`] 
+* [`h5::gapl_coll_metadata_ops{hbool_t}`] 
+* [`h5::dapl_coll_metadata_ops{hbool_t}`] 
+* [`h5::tapl_coll_metadata_ops{hbool_t}`] 
+* [`h5::lapl_coll_metadata_ops{hbool_t}`] 
+* [`h5::aapl_coll_metadata_ops{hbool_t}`] 
+* [`h5::dxpl_mpiio{H5FD_mpio_xfer_t xfer_mode}`][1709] Sets data transfer mode <br/>
+**Flags:** `h5::collective`, `h5::independent`
+* [`h5::dxpl_mpiio_chunk_opt{H5FD_mpio_chunk_opt_t opt_mode}`][1710] Sets a flag specifying linked-chunk I/O or multi-chunk I/O.<br/>
+**Flags:** `h5::chunk_one_io`, `h5::chunk_multi_io`
+* [`h5::dxpl_mpiio_chunk_opt_num{unsigned num_chunk_per_proc}`][1711] Sets a numeric threshold for linked-chunk I/O.
+* [`h5::dxpl_mpiio_chunk_opt_ratio{unsigned percent_proc_per_chunk}`][1712] Sets a ratio threshold for collective I/O.
+* [`h5::dxpl_mpiio_collective_opt{H5FD_mpio_collective_opt_t opt_mode}`][1713] Sets a flag governing the use of independent versus collective I/O.<br/>
+**Flags:** `h5::collective_io`, `h5::individual_io`
 
 
 
@@ -894,6 +874,7 @@ In order to execute install  `google-pprof` and `kcachegrind`.
 [1007]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetSharedMesgNIndexes
 [1008]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetSharedMesgIndex
 [1009]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetSharedMesgPhaseChange
+[1010]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetFileSpaceStrategy
 
 [1020]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#FileAccessPropFuncs
 [1021]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetDriver
@@ -930,7 +911,7 @@ In order to execute install  `google-pprof` and `kcachegrind`.
 [1052]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetSmallData
 [1053]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetLibverBounds
 [1054]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetObjectFlushCb
-
+[1055]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetDriver
 [1100]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#GroupCreatePropFuncs
 [1101]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetLocalHeapSizeHint
 [1102]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetLinkCreationOrder
@@ -988,6 +969,16 @@ In order to execute install  `google-pprof` and `kcachegrind`.
 [1711]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetDxplMpioChunkOptNum
 [1712]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetDxplMpioChunkOptRatio
 [1713]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetDxplMpioCollectiveOpt
+
+[1800]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#ObjectCreatePropFuncs
+[1801]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetCreateIntermediateGroup 
+[1802]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetObjTrackTimes
+[1803]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetAttrPhaseChange
+[1804]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetAttrCreationOrder
+
+[1900]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#ObjectCopyPropFuncs
+[1901]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetCopyObject
+[1902]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetMcdtSearchCb
 
 
 [601]: #file-creation-property-list
