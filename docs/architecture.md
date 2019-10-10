@@ -1,35 +1,98 @@
 
-# HDF5 Filesystem
+# HDF5
 <p align='justify'>
 Within the HDF5 container, datasets maybe stored in [compact, chunked or contiguous](#dataset-creation-property-list) layouts. The  stored datasets are referenced by strings separated with backslash character: `/`.
-The directory entries (non-leaf nodes) are called groups `h5::gr_t`, and the leaf nodes are the datasets `h5::ds_t` and named types `h5::dt_t`. Groups, datasets and named types can have `h5::att_t` attributes attached. At first glance the HDF5 appears as a regular file system.
+The directory entries (non-leaf nodes) are called groups `h5::gr_t`, and the leaf nodes are the datasets `h5::ds_t` and named types `h5::dt_t`. Groups, datasets and named types can have `h5::att_t` attributes attached. At first glance the HDF5 appears as a regular file system with a rich set of API calls.
 </p>
-<p align='justify'>
-The container sports an internal type system, as well as function calls to store the fixed or variable length data. The funciton may be fine tuned through 
- [property lists](#property-lists). To give an example [`h5::gzip{9}`][604] sets the data compression to maximum in the filter chain.</p> 
-
 ## Layouts
 #### Chunked Layout and Partial IO
-<p align='justify'>
-An economic way to access massive data sets is to break them into smaller blocks or chunks. While the CAPI supports complex selection of regions H5CPP restricts selection to a single strided block at a time. 
+An economic way to access massive data sets is to break them into smaller blocks or chunks. While the CAPI supports complex selection of regions for now H5CPP provides only economical means for sub-setting with `h5::block{}`, `h5::stride{}`. (1)
 
-* `h5::offset{...}` takes coordinates up to rank 7, and is to specify the origin of data transfer
-* `h5::count{...}` to determine the size of hyper slab in each dimension
-* `h5::stride{...}` to skip given elements
-* `h5::block{...}` 
-</p>
+Chunked layout may be requested by creating a dataset with `h5::chunk{..}` added to dataset creation property list which will implicitly set `h5::layout_chunked` flag on. 
+
+*The content of `[..]` are other optional dataset properties, `fd` is an opened HDF5 file descriptor of type `ht::fd_t`, `...` denotes omitted size definitions:*
+```cpp
+h5::ds_t ds = h5::create<double>(fd, "dataset", ...,
+		h5::chunk{4,8} [| h5::fill_value<double>{3} |  h5::gzip{9} ] );
+```
+
+Let `M` be a supported object type, or a raw memory region. For simplicity we pick an armadillo matrix: `arma::mat M(20,16)` then in order to save data to a larger dataset we need to pass the `M` object, the coordinates and possibly strides and blocks.
+`h5::write( ds,  M, h5::offset{4,8}, h5::stride{2,2} )`. The H5 operator will find the memory location of the object, the datatype and the size, these properties are passed to the underlying IO calls.
+
+When working with raw memory pointers, or H5CPP doesn't yet know of the object type, you need to specify the size of the object with `h5::count{..}`. 
+
+**Example:**
+
+```cpp
+h5::write( ds,  M.memptr(), h5::count{5,10} [, ...] );
+```
+
+The above operations can be expressed in a single line. To create a dataset of the appropriate size for partial IO and some filters, then write the entire content of `M` matrix into the dataset:
+```cpp
+h5::write(fd, "dataset", M, h5::chunk{4,8} | h5::fill_value<double>{3} |  h5::gzip{9} );
+```
+To learn more about [through examples click here](examples.md).
+
+
+(1) *The rational behind the decision is simplicity. Sub-setting requires to load data from disk to memory, then filter out the selected data which doesn't lead to IO bandwidth saving, but adds complexity.*
+
+
 
 #### Contiguous Layout and IO Access: continuous layout
 The simplest form of IO is to read a dataset entirely into memory, or write it to the disk. The upside is to reduce overhead when working with large amount of small size dataset. Indeed, when objects are saved in single IO op and no filtering is specified, H5CPP will choose this access pattern.  The downside of simplicity is lack of filtering. This layout is handy for small datasets.
 
+**Example:** in the simplest case, `h5::write` will open `arma.h5` with write access, then creates a data set with the right dimensions, and commences data transfer.
+```
+arma::vec V( {1.,2.,3.,4.,5.,6.,7.,8.});
+h5::write( "arma.h5", "one shot create write",  V);
+```
+To force contagious layout you need to pass `h5::contigous` flag with [`h5::dcpl_t`](#dataset-creation-property-list).
+```
+DATASET "one shot create write" {
+      DATATYPE  H5T_IEEE_F64LE
+      DATASPACE  SIMPLE { ( 8 ) / ( 8 ) }
+      STORAGE_LAYOUT {
+         CONTIGUOUS
+         SIZE 64
+         OFFSET 5888
+      }
+      FILTERS {
+         NONE
+      }
+      FILLVALUE {
+         FILL_TIME H5D_FILL_TIME_IFSET
+         VALUE  H5D_FILL_VALUE_DEFAULT
+      }
+      ALLOCATION_TIME {
+         H5D_ALLOC_TIME_LATE
+      }
+   }
 
-#### Data Space
+```
+
+#### Compact Layout
+is to store tiny data sets, perhaps the nodes of a very large graph. 
+
+
+#### Data Space and Dimensions
 is a way to tell the system how in-memory data mapped to file (or reverse). To give you an example picture a block of data in consecutive memory location that you wish to write to a cube shaped dataset. Other than that the data space may be fixed size, or able to be extended to a definite or unlimited size along some dimension.
 
 When working with supported objects, the in-memory dataspace is pre computed for you. And when passing raw pointers to IO operators, the filespace will determine the amount of memory used.
 
-* `h5::current_dims`
-* `h5::max_dims`
+List to describe dimensions of a dataset:
+
+* `h5::current_dims{i,j,k,..}` - actual dimension `i,j,k \in {1 - max}`
+* `h5::max_dims{...}` - maximum dimension, use `H5S_UNLIMITED` for infinite 
+* `h5::chunk{...}` - define block size, clever blocking arrangement increases throughout
+
+List how to select from datasets for read or write:
+
+* `h5::offset{...}` - start coordinates of data selection
+* `h5::stride{...}` - every `n` considered 
+* `h5::block{...}` - every `m` block is considered
+* `h5::count{...}` - the amount of data 
+
+**Note:** `h5::stride`, `h5::block` and scatter - gather operations doesn't work when `h5::high_throughput` set, due to performance reasons.
 
 #IO Operators
 <p align='justify'>
@@ -327,6 +390,65 @@ HDF5 supports variable and fixed strings. The former is of interest, as the most
 **not supported**: `wchar_t _wchar char16_t _wchar16 char32_t _wchar32`
 
 **TODO:** work out a new efficient storage mechanism for strings.
+
+# High Throughput Pipeline
+
+HDF5 comes with complex mechanism for type conversion, filtering, scatter - gather funtions,etc, but what if you need to engineer a system to bare metal without frills? `h5::high_throughput` data access property replaces the standard data processing mechanism with a BLAS level 3 blocking, a CPU cache aware filter chain and delegates all calls to `H5DOwrite_chunk` and `H5DOread_chunk` optimized calls.
+
+**Example:** to save an `arma::mat M(16,32)` into an HDF5 data set using direct chunk write, first pass `h5::high_throughput` data access property when opening/creating data set, make certain to choose chunked layout 
+by setting `h5::chunk{...}`. Optional standard filters and fill values may be set, however the data set element type **must match** with 
+the element type of `M`. There will be no type conversion taking place.
+```cpp
+h5::ds_t ds = h5::create<double>(fd,"bare metal IO",
+	h5::current_dims{43,57},     // multiple of chunks
+	h5::high_throughput,         // request IO pipeline
+	h5::chunk{4,8} | h5::fill_value<double>{3} |  h5::gzip{9} );
+```
+You **must align all IO calls to chunk boundaries:** `h5::offset % h5::chunk = 0` however the data set may have non-align size: `h5::count % h5::chunk != 0 -> OK`. Optionally define the amount of data transferred with `h5::count{..}`. When `h5::count{...}` is not specified, the dimension will be computed from the object. **Notice** `h5::offset{4,16}` is set to chunk boundary.
+
+Saving data near edges have matching behaviour with standard CAPI IO calls. The chunk within edge boundary having the correct content, and the outside is undefined.
+```
+h5::write( ds,  M, h5::count{4,8}, h5::offset{4,16} );
+```
+**Pros:**
+
+* Fast IO with direct chunk write/read
+* CPU cache aware filter chain
+* Option for threaded + pipelined filter chain
+
+**Cons:**
+
+* `h5::offset{..}` must be set to chunk boundaries
+* `h5::stride`, `h5::block` and other sub setting methods such as scatter - gather will not work
+
+
+
+The data set indeed is compressed, and readable from other systems:
+```
+HDF5 "arma.h5" {
+GROUP "/" {
+   DATASET "bare metal IO" {
+      DATATYPE  H5T_IEEE_F64LE
+      DATASPACE  SIMPLE { ( 40, 40 ) / ( 40, H5S_UNLIMITED ) }
+      STORAGE_LAYOUT {
+         CHUNKED ( 4, 8 )
+         SIZE 79 (162.025:1 COMPRESSION)
+      }
+      FILTERS {
+         COMPRESSION DEFLATE { LEVEL 9 }
+      }
+      FILLVALUE {
+         FILL_TIME H5D_FILL_TIME_IFSET
+         VALUE  3
+      }
+      ALLOCATION_TIME {
+         H5D_ALLOC_TIME_INCR
+      }
+   }
+}
+}
+
+```
 
 
 # Type System
