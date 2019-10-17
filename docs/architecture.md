@@ -39,14 +39,14 @@ To learn more about this topic [through examples click here](examples.md).
 
 
 #### Contiguous Layout and IO Access: continuous layout
-The simplest form of IO is to read a dataset entirely into memory, or write it to the disk. The upside is to reduce overhead when working with large amount of small size dataset. Indeed, when objects are saved in single IO op and no filtering is specified, H5CPP will choose this access pattern.  The downside of simplicity is lack of filtering. This layout is handy for small datasets.
+The simplest form of IO is to read a dataset entirely into memory, or write it to disk. The upside is to reduce overhead when working with a large amount of small size datasets. Indeed, when objects are saved in a single IO op and no filtering is specified, H5CPP will choose this access pattern.  The downside of simplicity is the lack of filtering. This layout is handy for small datasets.
 
-**Example:** in the simplest case, `h5::write` will open `arma.h5` with write access, then creates a data set with the right dimensions, and commences data transfer.
+**Example:** in the simplest case, `h5::write` opens `arma.h5` with write access, then creates a data set with the right dimensions, and the data transfer commences.
 ```
 arma::vec V( {1.,2.,3.,4.,5.,6.,7.,8.});
 h5::write( "arma.h5", "one shot create write",  V);
 ```
-To force contagious layout you need to pass `h5::contigous` flag with [`h5::dcpl_t`](#dataset-creation-property-list).
+To force contiguous layout, you need to pass the `h5::contigous` flag with [`h5::dcpl_t`](#dataset-creation-property-list).
 ```
 DATASET "one shot create write" {
       DATATYPE  H5T_IEEE_F64LE
@@ -71,46 +71,46 @@ DATASET "one shot create write" {
 ```
 
 #### Compact Layout
-is to store tiny data sets, perhaps the nodes of a very large graph. 
+is there to store tiny data sets, perhaps the nodes of a very large graph. 
 
 
 #### Data Space and Dimensions
-is a way to tell the system how in-memory data mapped to file (or reverse). To give you an example picture a block of data in consecutive memory location that you wish to write to a cube shaped dataset. Other than that the data space may be fixed size, or able to be extended to a definite or unlimited size along some dimension.
+tell the system how in-memory data is mapped to a file (or in reverse). To give you an example, picture a block of data in consecutive memory locations that you wish to write to a cube-shaped dataset. A data space may be of a fixed extent (size) or capable of extentsion to a definite or unlimited size along one or more dimensions.
 
-When working with supported objects, the in-memory dataspace is pre computed for you. And when passing raw pointers to IO operators, the filespace will determine the amount of memory used.
+When working with supported objects, the in-memory dataspace is pre-computed for you. And when passing raw pointers to IO operators, the filespace will determine the amount of memory used.
 
-List to describe dimensions of a dataset:
+Lists to describe dimensions of a dataset:
 
-* `h5::current_dims{i,j,k,..}` - actual dimension `i,j,k \in {1 - max}`
-* `h5::max_dims{...}` - maximum dimension, use `H5S_UNLIMITED` for infinite 
-* `h5::chunk{...}` - define block size, clever blocking arrangement increases throughout
+* `h5::current_dims{i,j,k,..}` - actual extent (dimensions) `i,j,k \in {1 - max}`
+* `h5::max_dims{...}` - maximum extent (dimensions), use `H5S_UNLIMITED` for infinite extent 
+* `h5::chunk{...}` - define block size, clever blocking arrangement may increase throughout
 
-List how to select from datasets for read or write:
+Lists to make selections from datasets for read or write:
 
-* `h5::offset{...}` - start coordinates of data selection
-* `h5::stride{...}` - every `n` considered 
+* `h5::offset{...}` - start coordinates of a data selection
+* `h5::stride{...}` - every `n`-th element is considered 
 * `h5::block{...}` - every `m` block is considered
-* `h5::count{...}` - the amount of data 
+* `h5::count{...}` - the number of blocks 
 
-**Note:** `h5::stride`, `h5::block` and scatter - gather operations doesn't work when `h5::high_throughput` set, due to performance reasons.
+**Note:** `h5::stride`, `h5::block` and scatter - gather operations don't work when `h5::high_throughput` is set, due to performance reasons.
 
 #IO Operators
 <p align='justify'>
-Modern C++ provides rich set of features to create variables and implement program logic running inside the compiler. This compile time mechanism, or template meta-programming, allows not only to match types but passing arguments in arbitrary order; much similarly to what we find in Python. The main difference however is in the implementation: the C++ version is without runtime overhead.
+Modern C++ provides a rich set of features to create variables and implement program logic that is running inside the compiler. This compile-time mechanism, or template meta-programming, allows not only to match types but to pass arguments in arbitrary order; very similar to what we find in Python. The main difference however is in the implementation: the C++ version incurs no runtime overhead.
 </p>
 
 In the next sections we guide you through H5CPP's CRUD like operators: `h5::create`,`h5::read`,`h5::write`,`h5::append` and `h5::open`, `h5::close`.
 The function calls are given in EBNF notation and we start with a few common tokens.
 
 
-Think of HDF5 as a container, or an image of a file system with a non-POSIX API to access its content. These containers/images may be passed around with standard file operations between computers, while the content may be retrieved with HDF5 specific IO calls. To reference a container within a file-system you either need to pass an open file descriptor `h5::fd_t` or the full path to the HDF5 file:
+Think of an HDF5 file as a container, or an image of a file system with a non-traditional file API to access its content. These containers/images may be passed around with standard file operations between computers, while the content may be retrieved with HDF5-specific IO calls. To reference such a container within a standard file-system, you either need to pass an open file descriptor `h5::fd_t` or the full path to the HDF5 file:
 ```cpp
 file ::= const h5::fd_t& fd | const std::string& file_path;
 ```
 
 
 An HDF5 Dataset is an object within the container, and to uniquely identify one you either have to pass an open dataset-descriptor `h5::ds_t` or tell the 
-system where to find the container, and the dataset within. In the latter case the necessary shim code is generated to obtain `h5::fd_t` descriptor at compile time.
+system where to find the container and the dataset within. In the latter case, the necessary shim code to obtain an `h5::fd_t` descriptor is generated at compile time.
 ```cpp
 dataset ::= (const h5::fd_t& fd | 
 	const std::string& file_path, const std::string& dataset_path ) | const h5::ds_t& ds;
@@ -119,17 +119,17 @@ dataset ::= (const h5::fd_t& fd |
 
 
 
-HDF5 datasets may take up various shapes and sizes in memory and on disk. A **dataspace** is a descriptor to specify the current size of the object, and if is capable of growing:
+HDF5 datasets can take on various shapes and sizes in memory and on disk. A **dataspace** is a descriptor to specify the current size of the object, and if and by how much it can be extended:
 ```cpp
 dataspace ::= const h5::sp_t& dataspace 
 	| const h5::current_dims& current_dim [, const h5::max_dims& max_dims ] 
 	[,const h5::current_dims& current_dim] , const h5::max_dims& max_dims;
 ```
 
-`T` type is the template parameter of an object. In the underlying implementation the element type is deduced compile time, bringing you a flexible abstract approach. The objects may be categorized into ones with continuous memory blocks, such as matrices, vectors, C style POD structures, and complex types such as C++ classes. The latter objects are not yet fully supported. More [detailed explanation in this section.](#types).
+`T` denotes the type-related template parameter of an object. In the underlying implementation, the element type is deduced at compile time, and represents a flexible, abstract approach. The objects may be categorized broadly into ones with continuous memory blocks, such as matrices, vectors, C style POD structures, etc. and complex types such as C++ classes. The latter objects are not yet fully supported. More [detailed explanation in this section.](#types).
 
 #### OPEN
-The [previous section](#pythonic-syntax) explained the EBNF tokens: `file`,`dataspace`. The behaviour of the objects are controlled through property lists and the syntax is rather simple:
+The [previous section](#pythonic-syntax) explained the EBNF tokens: `file`,`dataspace`. The behaviour of the objects is controlled through property lists and the syntax is rather simple:
 ```cpp
 [file]
 h5::fd_t h5::open( const std::string& path,  H5F_ACC_RDWR | H5F_ACC_RDONLY [, const h5::fapl_t& fapl] );
@@ -153,7 +153,7 @@ template <typename T> h5::ds_t h5::create<T>( file, const std::string& dataset_p
 ```
 Property lists are: [`h5::fcpl_t`][601], [`h5::fapl_t`][602], [`h5::lcpl_t`][603], [`h5::dcpl_t`][604], [`h5::dapl_t`][605]
 
-**Example:** to create an HDF5 container, and a dataset within:
+**Example:** Let's create an HDF5 container and a dataset within:
 ```cpp
 #include <h5cpp/all>
 ...
@@ -172,12 +172,12 @@ ds["attribute-name"] = std::vector<int>(10);
 #### READ
 There are two kind of operators:
 
-* **returning an object** are useful when you access data in a single shot, outside of a loop. The object is created with the right size and return value optimization or RVO will make sure that no copy takes place.
-* **updating an existing object** are for repeating access, inside a loop, where stressing the memory would be detrimental. It is your responsibility to create the right size of object, then the templates will grab the memory location whenever possible then transfer data from disk to that location directly
+* Operators **returning an object** are useful when you access data in a single shot, outside of a loop. The object is created with the right size and return value optimization (RVO) and will ensure that no copy takes place.
+* Operators **updating an existing object** are for repeated access, inside a loop, where (de-)allocating memory would be detrimental to performance. Hence, it is your responsibility to create the right size of object. Then the templates will use the memory location provided whenever possible and transfer data from disk to that location directly
 without temporaries.
 
 
-Keep in mind that the underlying HDF5 system always reserves a chunk size buffer for data transfer, usually for filtering and or data conversion. Nevertheless this data transfer buffer is minimal -- as under ideal conditions the chunks should be not more than the level 3 cache size of the processor.
+Keep in mind that the underlying HDF5 system always reserves a chunk-sized buffer for data transfer, usually for filtering or data conversion. Nevertheless this data transfer buffer is minimal -- as under ideal conditions the chunk size should not be larger than the level 3 cache size of the processor.
 ```cpp
 template <typename T> T h5::read( dataset
 	[, const h5::offset_t& offset]  [, const h5::stride_t& stride] [, const h5::count_t& count]
@@ -188,7 +188,7 @@ template <typename T> h5::err_t h5::read( dataset, T& ref
 ```
 Property lists are: [`dxpl_t`][606]
  
-**example:** to read a 10x5 matrix from a 3D array from location {3,4,1}
+**Example:** Let's read a 10x5 matrix from a 3D array from location {3,4,1}
 ```cpp
 #include <armadillo>
 #include <h5cpp/all>
@@ -207,10 +207,10 @@ try {
 #### WRITE
 There are two kind of operators:
 
-* **reference** are for objects H5CPP is aware of. This is the recommended pattern, and have the same performance characteristics of the pointer types; except the convenience.
-* **pointer** support any raw memory locations, as long as they are continous. Mostly useful for cases not covered. You pick the memory location, tell the data transfer properties and the rest is taken care of.
+* **Reference**-consuming operators are for objects H5CPP is aware of. This is the recommended pattern, and these operators have the same performance characteristics of the pointer types plus the convenience.
+* **Pointer**-consuming operators support any raw memory locations, as long as they are contiguous. They are useful mostly for cases not covered otherwise. You pick the memory location, supply the data transfer properties, and the rest is taken care of.
 
-Keep in mind that the underlying HDF5 system always reserves a chunk size buffer for data transfer, usually for filtering and or data conversion. Nevertheless this data transfer buffer is minimal -- as under ideal conditions the chunks should be not more than the level 3 cache size of the processor.
+Keep in mind that the underlying HDF5 system always reserves a chunk-sized buffer for data transfer, usually for filtering and or data conversion. Nevertheless this data transfer buffer is minimal -- as under ideal conditions the chunk size should not be larger than the level 3 cache size of the processor.
 
 ```cpp
 template <typename T> h5::err_t h5::write( dataset,  const T& ref
@@ -228,9 +228,9 @@ h5::fd_t fd = h5::create("some_file.h5",H5F_ACC_TRUNC);
 h5::write(fd,"/result",M);
 ```
 #### APPEND
-When receiving a stream of data, packet tables are the way to go. While this operator does rely on its own `h5::pt_t` descriptor, the underlying dataset is just the same old one introduced in previous section. The `h5::pt_t` are seamlessly convertible to `h5::ds_t` and vica-versa. 
+When receiving a stream of data, packet tables are most likely the way to go. While this operator does rely on its own `h5::pt_t` descriptor, the underlying dataset is just the same old one introduced in previous section. The `h5::pt_t` handles seamlessly convert to `h5::ds_t` and vica-versa. 
 
-However the similarity ends with that. `h5::pt_t` internals are different from other H5CPP handles, as it has internal buffer and a custom data transfer pipeline. This pipeline can also be used in regular data-transfer operations by adding `h5::experimental` to data transfer property lists. The experimental pipeline is [documented here.][308]
+However, that's where the similarity ends. The `h5::pt_t` internals are different from other H5CPP handles, as it has an internal buffer and a custom data transfer pipeline. This pipeline can also be used in regular data-transfer operations by adding `h5::experimental` to data transfer property lists. The experimental pipeline is [documented here.][308]
 
 
 
@@ -241,7 +241,7 @@ However the similarity ends with that. `h5::pt_t` internals are different from o
 template <typename T> void h5::append(h5::pt_t& ds, const T& ref);
 ```
 
-**example:**
+**Example:**
 ``` c++
 #include <h5cpp/core>
 	#include "your_data_definition.h"
@@ -269,14 +269,14 @@ while( having_a_good_day ){
 # Supported Objects
 
 ### Linear Algebra
-HDF5 CPP is to simplify object persistence by implementing [CREATE][create], [READ][read], [WRITE][write], [APPEND][append] operations on **fixed** or **variable length** N dimensional arrays.
-This header only implementation supports [raw pointers][99] | [armadillo][100] | [eigen3][102] | [blaze][106] | [blitz++][103] |  [it++][104] | [dlib][105] |  [uBlas][101] by directly operating on the underlying data-store, avoiding intermediate/temporary memory allocations and [using copy elision][copy_elision] for returning objects:
+H5CPP simplifies object persistence by implementing [CREATE][create], [READ][read], [WRITE][write], [APPEND][append] operations on **fixed** or **variable-length** N-dimensional arrays.
+This header-only implementation supports [raw pointers][99] | [armadillo][100] | [eigen3][102] | [blaze][106] | [blitz++][103] | [it++][104] | [dlib][105] |  [uBlas][101] by operating directly on the underlying data-store, by avoiding intermediate/temporary memory allocations and by [using copy elision][copy_elision] for returning objects:
 
 ```cpp
 arma::mat rvo = h5::read<arma::mat>(fd, "path_to_object"); //return value optimization:RVO
 ```
 
-For high performance operations ie: within loops update the content with partial IO call:
+For high performance operations, e.g., within loops, update the content with partial IO calls:
 ```cpp
 h5::ds_t ds = h5::open( ... ) 		// open dataset
 arma::mat M(n_rows,n_cols);   		// create placeholder, data-space is reserved on the heap
@@ -284,7 +284,7 @@ h5::count_t  count{n_rows,n_cols}; 	// describe the memory region you are readin
 h5::offset_t offset{0,0}; 			// position we reasing data from
 // high performance loop with minimal memory operations
 for( auto i: column_indices )
-	h5::read(ds, M, count, offset); // count, offset and other proeprties may be speciefied in any order
+	h5::read(ds, M, count, offset); // count, offset and other properties may be speciefied in any order
 ```
 
 List of objects supported in EBNF:
@@ -306,7 +306,7 @@ ptr 	:= T*
 accept 	:= ref | ptr 
 ```
 
-Here is the chart how supported linalgebra systems implement acessors, memory layout:
+Here is the chart how supported linalgebra systems implement acessors and their memory layout:
 
 ```
 		data            num elements  vec   mat:rm                mat:cm                   cube
@@ -323,30 +323,30 @@ dlib  {&ref(0,0)}        {size()}          {nc():1,    nr():0}
 
 
 #### Storage Layout: [Row / Column ordering][200]
-H5CPP guarantees zero copy, platform and system independent correct behaviour between supported linear algebra Matrices.
-In linear algebra the de-facto standard is column major ordering similarly to Fortran. However this is changing and many of the above listed linear algebra systems support row-major ordering as well.
+H5CPP guarantees zero copy, platform- and system-independent correct behaviour between supported linear algebra matrices.
+In linear algebra, the de-facto standard is column-major ordering similarly to Fortran. However this is changing and many of the above listed linear algebra systems support row-major ordering as well.
 
-Currently there is no easy way to automatically transpose column major matrix such as `arma::mat` into row major storage. One solution would be to 
-do the actual transpose operation when loading/saving the matrix by a custom filter. The alternative is to mark the object as transposed, following BLAS strategy. The latter approach has minimal approach on performance, but requires cooperation from other library writers. Unfortunatelly the HDF5 CAPI doesn't support either of them. Nevertheless **manual transpose** always works, and is supported by most linear algebra systems.
+Currently there is no easy way to automatically transpose a column-major matrix such as `arma::mat` into row-major storage. One solution would be to 
+do the actual transpose operation when loading/saving the matrix by a custom filter. The alternative is to mark the object as transposed, following the BLAS strategy. The latter approach has a minimal impact on performance, but requires cooperation from other library writers. Unfortunately, the HDF5 CAPI doesn't support either of them. Nevertheless, **manual transpose** always works, and is supported by most linear algebra systems.
 
 #### Sparse Matrices/Vectors
 Compressed Sparse Row ([CSR][csr]) and Compressed Sparse Column ([CSC][csc]) formats will be supported. The actual storage format may be multi objects inside a `h5::gr_t` group, or a single compound data type as a place holder for the indices and actual data. Special structures such as block diagonal, tri diagonal, triangular are not yet supported. Nevertheless will follow BLAS/LAPACK storage layout whenever possible.
 
 
 ### The STL
-There are three notable categories from storage perspective:
+From a storage perspective, there are three notable categories:
 
 * `std::vector<T>`, `std::array<T,N>` have `.data()` accessors and H5CPP can directly load/save data from the objects. For efficient partial data transfer the data transfer size must match the element size of the objects.
 
 * `std::list<T>`, `std::forward_list<T>`, `std::deque<T>`, `std::set<T>`, `std::multiset<T>`,`std::unordered_set<T>`,`std::map<K,V>`,`std::multimap<K,V>`, `std::unordered_multimap<K,V>`
-don't have direct access to underlying memory store, instead provided iterators are used for data transfer between memory and disk. The IO transaction is broken into chunk size blocks and loaded into STL objects. This method has a maximum memory requirements of `element_size * ( container_size + chunk_size )`
+don't have direct access to the underlying memory store and the provided iterators are used for data transfer between memory and disk. The IO transaction is broken into chunk-sized blocks and loaded into STL objects. This method has a maximum memory requirement of `element_size * ( container_size + chunk_size )`
 
-* `std::stack`,`std::queue`,`std::priority_queue` are adaptors, the underlying data-structure determines how data transfer takes place
+* `std::stack`,`std::queue`,`std::priority_queue` are adaptors; the underlying data-structure determines how data transfers take place.
 
 ### Raw Pointers
-Currently only memory blocks are supported in consecutive/adjacent location of elementary or POD types. This method comes handy when an object type is not supported. You find the way to grab a pointer to its internal datastore and the size then pass this as an argument. For [read][read] operation make sure there is enough memory reserved, for [write][write] operation you must specify the data transfer size with `h5::count`
+Currently only memory blocks are supported in consecutive/adjacent location of elementary or POD types. This method comes in handy when an object type is not supported. You need to find a way to grab a pointer to its internal datastore and the size, and then pass this as an argument. For [read][read] operations, make sure there is enough memory reserved; for [write][write] operations, you must specify the data transfer size with `h5::count`.
 
-**Example:** loading data from HDF5 dataset to a memory location
+**Example:** Let's load data from an HDF5 dataset to a memory location
 ```cpp
 my_object obj(100);
 h5::read("file.h5","dataset.dat",obj.ptr(), h5::count{10,10}, h5::offset{100,0});
@@ -354,7 +354,7 @@ h5::read("file.h5","dataset.dat",obj.ptr(), h5::count{10,10}, h5::offset{100,0})
 
 ### Compound Datatypes
 #### POD Struct/Records
-Arbitrary deep and complex Plain Old Structured (POD) are supported either by [h5cpp compiler][compiler] or manually writing the necessary shim code. The following example is generated with `h5cpp` compiler, note that in the first step you have to specialize `template<class Type> hid_t inline register_struct<Type>();` to the type you are to use it with and return an HDF5 CAPI `hid_t` type identifier. This `hid_t` object references a memory location inside the HDF5 system, and will be automatically released with `H5Tclose` when used with H5CPP templates. The final step is to register this new type with H5CPP type system : `H5CPP_REGISTER_STRUCT(Type);`.
+Arbitrarily deep and complex Plain Old Structured (POD) are supported either by the [h5cpp compiler][compiler] or by manually writing the necessary shim code. The following example was generated with the `h5cpp` compiler. Note that in the first step you have to specialize `template<class Type> hid_t inline register_struct<Type>();` to the type you want to use it with and return an HDF5 CAPI `hid_t` type identifier. This `hid_t` object references a memory location inside the HDF5 system, and will be automatically released with `H5Tclose` when used with H5CPP templates. The final step is to register this new type with H5CPP type system : `H5CPP_REGISTER_STRUCT(Type);`.
 
 ```cpp
 namespace sn {
@@ -377,15 +377,15 @@ The internal typesystem for POD/Record types supports:
 
 * `std::is_integral` and `std::is_floating_point`
 * `std::is_array` plain old array type, but not `std::array` or `std::vector` 
-* arrays of the the above, with arbitrary embedding
-* POD structs of the above with arbitrary embedding
+* arrays of the the above, with arbitrary nesting
+* POD structs of the above with arbitrary nesting
 
 
 #### C++ Classes
 Work in progress. Requires modification to compiler as well as coordinated effort how to store complex objects such that other platforms capable of reading them.
 
 ### Strings
-HDF5 supports variable and fixed strings. The former is of interest, as the most common ways for storing strings in a file: consecutively with a separator. The current storage layout is a heap data structure making it less suitable for massive Terra Byte scale storage. In addition the strings have to be copied during [read][read] operation. Both filtering such as `h5::gzip{0-9}` and `h5::utf8` features are supported.
+HDF5 supports variable- and fixed-length strings. The former is of interest, as the most common way for storing strings in a file: consecutive characters with a separator. The current storage layout is a heap data structure making it less suitable for massive Terabyte-scale storage. In addition, the strings have to be copied during [read][read] operations. Both filtering, such as `h5::gzip{0-9}`, and encoding, such as `h5::utf8`, are supported.
 
 **not supported**: `wchar_t _wchar char16_t _wchar16 char32_t _wchar32`
 
@@ -393,20 +393,20 @@ HDF5 supports variable and fixed strings. The former is of interest, as the most
 
 # High Throughput Pipeline
 
-HDF5 comes with complex mechanism for type conversion, filtering, scatter - gather funtions,etc, but what if you need to engineer a system to bare metal without frills? `h5::high_throughput` data access property replaces the standard data processing mechanism with a BLAS level 3 blocking, a CPU cache aware filter chain and delegates all calls to `H5DOwrite_chunk` and `H5DOread_chunk` optimized calls.
+HDF5 comes with a complex mechanism for type conversion, filtering, scatter/gather-funtions,etc. But what if you need to engineer a system to bare metal without frills? The `h5::high_throughput` data access property replaces the standard data processing mechanism with a BLAS level 3 blocking, a CPU cache-aware filter chain and delegates all calls to the `H5Dwrite_chunk` and `H5Dread_chunk` optimized calls.
 
-**Example:** to save an `arma::mat M(16,32)` into an HDF5 data set using direct chunk write, first pass `h5::high_throughput` data access property when opening/creating data set, make certain to choose chunked layout 
-by setting `h5::chunk{...}`. Optional standard filters and fill values may be set, however the data set element type **must match** with 
-the element type of `M`. There will be no type conversion taking place.
+**Example:** Let's save an `arma::mat M(16,32)` into an HDF5 data set using direct chunk write! First we pass the `h5::high_throughput` data access property when opening/creating data set and make certain to choose chunked layout 
+by setting `h5::chunk{...}`. Optional standard filters and fill values may be set, however, the data set element type **must match**
+the element type of `M`. No type conversion will be taking place!
 ```cpp
 h5::ds_t ds = h5::create<double>(fd,"bare metal IO",
 	h5::current_dims{43,57},     // multiple of chunks
 	h5::high_throughput,         // request IO pipeline
 	h5::chunk{4,8} | h5::fill_value<double>{3} |  h5::gzip{9} );
 ```
-You **must align all IO calls to chunk boundaries:** `h5::offset % h5::chunk = 0` however the data set may have non-align size: `h5::count % h5::chunk != 0 -> OK`. Optionally define the amount of data transferred with `h5::count{..}`. When `h5::count{...}` is not specified, the dimension will be computed from the object. **Notice** `h5::offset{4,16}` is set to chunk boundary.
+You **must align all IO calls to chunk boundaries:** `h5::offset % h5::chunk == 0`. However, the dataset may have non-aligned size: `h5::count % h5::chunk != 0 -> OK`. Optionally, define the amount of data transferred with `h5::count{..}`. When `h5::count{...}` is not specified, the dimensions will be computed from the object. **Notice** `h5::offset{4,16}` is set to a chunk boundary.
 
-Saving data near edges have matching behaviour with standard CAPI IO calls. The chunk within edge boundary having the correct content, and the outside is undefined.
+The bahviour of saving data near edges matches the behaviour of standard CAPI IO calls. The chunk within an edge boundary having the correct content, and the outside being undefined.
 ```
 h5::write( ds,  M, h5::count{4,8}, h5::offset{4,16} );
 ```
@@ -418,7 +418,7 @@ h5::write( ds,  M, h5::count{4,8}, h5::offset{4,16} );
 
 **Cons:**
 
-* `h5::offset{..}` must be set to chunk boundaries
+* `h5::offset{..}` must be aligned with chunk boundaries
 * `h5::stride`, `h5::block` and other sub setting methods such as scatter - gather will not work
 
 
@@ -452,7 +452,7 @@ GROUP "/" {
 
 
 # Type System
-In the core of H5CPP there lies the type mapping mechanism to HDF5 NATIVE types. All type requests are redirected to this segment in one way or another. That includes supported vectors, matrices, cubes, C like structs etc. While HDF5 internally supports type translations among various binary representation H5CPP restricts type handling to the most common case where the program intended to run. This is not in violation of HDF5 use-anywhere policy, just type conversion is delegated to hosts with different binary representation. Since the most common processors are Intel and AMD this approach has the advantage of skipping any conversion.
+At the heart of H5CPP lies the type mapping mechanism to HDF5 NATIVE types. All type requests are redirected to this segment in one way or another. That includes supported vectors, matrices, cubes, C like structs, etc. While HDF5 internally supports type translations among various binary representation, H5CPP restricts type handling to the most common case where the program intended to run. This is not in violation of HDF5 use-anywhere policy, just type conversion is delegated to hosts with different binary representation. Since the most common processors are Intel and AMD, this approach has the advantage of skipping any conversion.
 
 ```yacc
 integral 		:= [ unsigned | signed ] [int_8 | int_16 | int_32 | int_64 | float | double ] 
