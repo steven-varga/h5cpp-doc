@@ -8,16 +8,21 @@ The directory entries (non-leaf nodes) are called groups `h5::gr_t`, and the lea
 #### Chunked Layout and Partial IO
 An economic way to access massive data sets is to break them into smaller blocks or chunks. While the CAPI supports complex selection of regions for now H5CPP provides only economical means for sub-setting with `h5::block{}`, `h5::stride{}`. (1)
 
-Chunked layout may be requested by creating a dataset with `h5::chunk{..}` added to dataset creation property list which will implicitly set `h5::layout_chunked` flag on. 
+Chunked layout may be requested by creating a dataset with `h5::chunk{..}` added to dataset creation property list which will implicitly set `h5::layout_chunked`. 
 
-*The content of `[..]` are other optional dataset properties, `fd` is an opened HDF5 file descriptor of type `ht::fd_t`, `...` denotes omitted size definitions:*
 ```cpp
 h5::ds_t ds = h5::create<double>(fd, "dataset", ...,
 		h5::chunk{4,8} [| h5::fill_value<double>{3} |  h5::gzip{9} ] );
 ```
+*The content of `[..]` are other optional dataset properties, `fd` is an opened HDF5 file descriptor of type `ht::fd_t`, `...` denotes omitted size definitions*
 
-Let `M` be a supported object type, or a raw memory region. For simplicity we pick an armadillo matrix: `arma::mat M(20,16)` then in order to save data to a larger dataset we need to pass the `M` object, the coordinates and possibly strides and blocks.
-`h5::write( ds,  M, h5::offset{4,8}, h5::stride{2,2} )`. The H5 operator will find the memory location of the object, the datatype and the size, these properties are passed to the underlying IO calls.
+Let `M` be a supported object type, or a raw memory region. For simplicity we pick an armadillo matrix: `arma::mat M(20,16)` then to save data into a larger dataset we need to pass the `M` object, the coordinates and possibly strides and blocks:
+
+```cpp
+h5::write( ds,  M, h5::offset{4,8} [, h5::stride{2,2}] )
+```
+
+The H5 operator will find the memory location of the object, the datatype and the size, these properties are passed to the underlying IO calls.
 
 When working with raw memory pointers, or H5CPP doesn't yet know of the object type, you need to specify the size of the object with `h5::count{..}`. 
 
@@ -71,8 +76,7 @@ DATASET "one shot create write" {
 ```
 
 #### Compact Layout
-is to store tiny data sets, perhaps the nodes of a very large graph. 
-
+`TODO:`
 
 #### Data Space and Dimensions
 is a way to tell the system how in-memory data mapped to file (or reverse). To give you an example picture a block of data in consecutive memory location that you wish to write to a cube shaped dataset. Other than that the data space may be fixed size, or able to be extended to a definite or unlimited size along some dimension.
@@ -137,8 +141,12 @@ h5::fd_t h5::open( const std::string& path,  H5F_ACC_RDWR | H5F_ACC_RDONLY [, co
 [dataset]
 h5::ds_t h5::open( const  h5::fd_t& fd, const std::string& path [, const h5::dapl_t& dapl] )
 ```
-Property lists are:  [`h5::fapl_t`][602],  [`h5::dapl_t`][605]
+Property lists are:  [`h5::fapl_t`][602],  [`h5::dapl_t`][605]. The flags are useful for multiple reader single writer paradigm, only a single process may open an HDF5 file for write at a time.
 
+* `H5F_ACC_RDWR` read write access
+* `H5F_ACC_RDONLY` read only access
+
+If the exclusive write is a restriction for you, check out parallel HDF5, where many processes can write into a single file with `h5::collective` or `h5::individual` access pattern. On supercomputers and MPI based HPC clusters it is suggested to use parallel HDF5, as it scales to 100's of GByte/sec throughput. 
 #### CREATE
 
 ```cpp
@@ -263,7 +271,71 @@ while( having_a_good_day ){
 }
 ```
 
+# Attributes
 
+are the HDF5 way to attach side band information to `h5::gr_t` groups/directories, `h5::ds_t` datasets and `h5::dt_t` persisted datatypes. The basic IO operators  [support all object types](#supported-objects).
+
+The following templates are defined, where `P ::= h5::ds_t | h5::gr_t | h5::ob_t | h5::dt_t` is any of the handle/descriptor types. `std::tuple<T...>` describes set of operations with pair wise arguments such that tuple elements are the pairwise sequence of attribute names and values.
+
+
+* `h5::at_t acreate( const P& parent, const std::string& name, args_t&&... args );`
+* `h5::at_t aopen(const  P& parent, const std::string& name, const h5::acpl_t& acpl);`
+* `T aread( const P& parent, const std::string& name, const h5::acpl_t& acpl)`
+* `h5::att_t awrite( const P& parent, const std::string& name, const T& ref, const h5::acpl_t& acpl)`
+* `void awrite( const P& parent, const std::tuple<Field...>& fields, const h5::acpl_t& acpl)`
+
+**Example:** The following snippet will create 3 sets of attribute then decorate the `h5::gr_t group` with them. Notice the use of mixed CAPI calls and how to wrap the returning `hid_t` type to RAII capable `h5::gr_t` thin template class.
+```cpp
+auto attributes = std::make_tuple(
+		"author", "steven varga",  "company","vargaconsulting.ca",  "year", 2019);
+// freely mixed CAPI call returned `hid_t id` is wrapped in RAII capable H5CPP template class: 
+h5::gr_t group{H5Gopen(fd,"/my-data-set", H5P_DEFAULT)};
+// templates will synthesize code from std::tuple, resulting in 3 attributes created and written into `group` 
+h5::awrite(group, attributes);
+```
+
+
+
+### Syntactic Sugar: Operators
+Since the attribute interface is under development, currently only the write calls are supported.
+
+**Example:** similarly to data sets the attribute interface embraces `h5cpp` compiler assisted reflection technology, and capable of automatic
+handling of arbitrary C POD structs. *The following excerpt is from:* `examples/attributes/attributes.cpp`
+```
+...
+std::vector<sn::example::Record> vector = h5::utils::get_test_data<sn::example::Record>(40);
+sn::example::Record& record = vector[3];
+
+h5::fd_t fd = h5::create("001.h5", H5F_ACC_TRUNC, h5::default_fcpl,
+					h5::libver_bounds({H5F_LIBVER_V18, H5F_LIBVER_V18}) );
+h5::ds_t ds = h5::write(fd,"directory/dataset", M);
+
+ds["att_01"] = 42 ;
+ds["att_02"] = {1.,2.,3.,4.};
+ds["att_03"] = {'1','2','3','4'};
+ds["att_04"] = {"alpha", "beta","gamma","..."};
+
+ds["att_05"] = "const char[N]";
+ds["att_06"] = u8"const char[N]áééé";
+ds["att_07"] = std::string( "std::string");
+
+ds["att_08"] = record; // pod/compound datatype
+ds["att_09"] = vector; // vector of pod/compound type
+ds["att_10"] = matrix; // linear algebra object
+```
+
+### Tweaks/Hacks
+In some cases you may want to adjust what objects may have attributes. Here is the printout of `H5Acreate.hpp` where `is_valid_attr` template is defined. 
+The current definition allows: `h5::ds_t | h5::gr_t | h5::ob_t | h5::dt_t` handles/type descriptors, and in most cases no need for adjustments.
+```
+namespace impl {
+	/*this template defines what HDF5 object types may have attributes */
+	template <class H, class T=void> using is_valid_attr =
+		std::integral_constant<bool, 
+			std::is_same<H, h5::gr_t>::value || std::is_same<H, h5::ds_t>::value ||
+			std::is_same<H, h5::ob_t>::value || std::is_same<H, h5::dt_t<T>>::value>;
+}
+```
 
 
 # Supported Objects
@@ -400,13 +472,13 @@ by setting `h5::chunk{...}`. Optional standard filters and fill values may be se
 the element type of `M`. There will be no type conversion taking place.
 ```cpp
 h5::ds_t ds = h5::create<double>(fd,"bare metal IO",
-	h5::current_dims{43,57},     // multiple of chunks
+	h5::current_dims{43,57},     // doesn't have to be multiple of chunks
 	h5::high_throughput,         // request IO pipeline
 	h5::chunk{4,8} | h5::fill_value<double>{3} |  h5::gzip{9} );
 ```
 You **must align all IO calls to chunk boundaries:** `h5::offset % h5::chunk = 0` however the data set may have non-align size: `h5::count % h5::chunk != 0 -> OK`. Optionally define the amount of data transferred with `h5::count{..}`. When `h5::count{...}` is not specified, the dimension will be computed from the object. **Notice** `h5::offset{4,16}` is set to chunk boundary.
 
-Saving data near edges have matching behaviour with standard CAPI IO calls. The chunk within edge boundary having the correct content, and the outside is undefined.
+Saving data near edges have matching behavior with standard CAPI IO calls. The chunk within edge boundary having the correct content, and the outside is undefined.
 ```
 h5::write( ds,  M, h5::count{4,8}, h5::offset{4,16} );
 ```
@@ -415,12 +487,13 @@ h5::write( ds,  M, h5::count{4,8}, h5::offset{4,16} );
 * Fast IO with direct chunk write/read
 * CPU cache aware filter chain
 * Option for threaded + pipelined filter chain
+* minimal code length, fast implementation
 
 **Cons:**
 
 * `h5::offset{..}` must be set to chunk boundaries
 * `h5::stride`, `h5::block` and other sub setting methods such as scatter - gather will not work
-
+* disk and memory type must match - no type conversion
 
 
 The data set indeed is compressed, and readable from other systems:
@@ -450,6 +523,8 @@ GROUP "/" {
 
 ```
 
+# MPI-IO
+Parallel Filesystems 
 
 # Type System
 In the core of H5CPP there lies the type mapping mechanism to HDF5 NATIVE types. All type requests are redirected to this segment in one way or another. That includes supported vectors, matrices, cubes, C like structs etc. While HDF5 internally supports type translations among various binary representation H5CPP restricts type handling to the most common case where the program intended to run. This is not in violation of HDF5 use-anywhere policy, just type conversion is delegated to hosts with different binary representation. Since the most common processors are Intel and AMD this approach has the advantage of skipping any conversion.
@@ -651,6 +726,7 @@ h5::fapl_t fapl = h5::fclose_degree_weak | h5::fapl_core{2048,1} | h5::core_writ
 
 ## Dataset Operations
 #### [Dataset Creation Property List][1500]
+Filtering properties require `h5::chunk{..}` set to sensible values. Not having set `h5::chunk{..}` set is equal with requesting `h5::layout_contigous` a dataset layout without chunks, filtering and sub-setting capabilities. This layout is useful for single shot read/write operations, and is the prefered method to save small linear algebra objects.
 **Example:**
 ```cpp
 h5::dcpl_t dcpl = h5::chunk{1,4,5} | h5::deflate{4} | h5::layout_compact | h5::dont_filter_partial_chunks
@@ -673,7 +749,15 @@ h5::dcpl_t dcpl = h5::chunk{1,4,5} | h5::deflate{4} | h5::layout_compact | h5::d
 * [`h5::shuffle`][1512] Sets up use of the shuffle filter.
 
 #### [Dataset Access Property List][1600]
-In addition to CAPI properties, a custom `high_throughput` property is added, to request alternative, simpler but more efficient pipeline.
+In addition to CAPI properties the follwoing properties are added to provide finer control dataset layouts, and filter chains.
+
+* Mutually exclusive Sparse Matrix Properties to alternate between formats
+
+	* **`h5::csc`** compressed sparse column format
+	* **`h5::csr`** compressed sparse row format
+	* **`h5::coo`** coordinates list
+
+* **`h5::multi{["field 0", .., "field n"]}`** objects are persisted in multiple datasets with optional field name definition. When specified the system will break up compound classes into basic components and writes each of them into a directory/folder specified with `dataset_name` argument.
 
 * **`h5::high_throughput`** Sets high throughput H5CPP custom filter chain. HDF5 library comes with a complex, feature rich environment to index data-sets by strides, blocks, or even by individual coordinates within chunk boundaries - less fortunate the performance impact on throughput.  Setting this flag will replace the built in filter chain with a simpler one (without complex indexing features), then delegates IO calls to the recently introduced [HDF5 Optimized API][400] calls.<br/>
 
@@ -924,9 +1008,6 @@ only the following objects:
 * h5::sp_t
 * h5::
 
-
-### Custom Filter Pipeline
-To Be Written
 
 ### Performance
 |    experiment                               | time  | trans/sec | Mbyte/sec |
