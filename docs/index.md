@@ -3,15 +3,14 @@
  Author: Varga, Steven <steven@vargaconsulting.ca>
 --->
 
-### Easy to use  [HDF5][hdf5] C++ templates for Serial and Paralell HDF5  
+### Easy-to-use  [HDF5][hdf5] C++ templates for Serial and Parallel HDF5  
 <p align='justify'>
-[Hierarchical Data Format][hdf5] prevalent in high performance scientific computing, sits directly on top of sequential or parallel file systems, providing block and stream operations on standardized or custom binary/text objects. Scientific computing platforms such as Python, R, Matlab, Fortran,  Julia [and many more...] come with the necessary libraries to read write HDF5 dataset. This edition simplifies interactions with [popular linear algebra libraries][304], provides [compiler assisted seamless object persistence][303], Standard Template Library support and equipped with novel [error handling architecture][400].
+The [Hierarchical Data Format][hdf5], prevalent in high performance scientific computing, sits directly on top of sequential or parallel file systems, providing block and stream operations on standardized or custom binary/text objects. Popular scientific computing platforms such as Python, R, Matlab, Fortran,  Julia [and many more...] come with the necessary libraries to read and write HDF5 datasets. The present effort simplifies the interaction with [popular linear algebra libraries][304], provides [compiler assisted seamless object persistence][303], Standard Template Library support, and comes equipped with a novel [error handling architecture][400].
 </p> 
 <p align='justify'>
-H5CPP is a novel approach to  persistence in the field of machine learning, it provides high performance sequential and block access to HDF5 containers through modern C++
+H5CPP is a novel approach to  persistence in the field of machine learning, it provides high performance sequential and block access to HDF5 containers through modern C++.
 </p>
-All **file and dataset io** descriptors implement [raii idiom][301] and close underlying resource when going out of scope, 
-and may be seamlessly passed to HDF5 CAPI calls when implicit conversion enabled. Similarly templates can take CAPI `hid_t` identifiers as arguments where applicable provided conversion policy allows. See [conversion policy][306] for details.
+All H5CPP **file and dataset IO** descriptors implement the [raii idiom][301] and close underlying resource when going out of scope. They can be passed seamlessly to HDF5 CAPI calls when implicit conversion is enabled. Similarly, templates can take CAPI `hid_t` identifiers as arguments where applicable, provided the chosen conversion policy allows it. See [conversion policy][306] for details.
 
 The system supports CRUD like IO operators: [`h5::create`][700], [`h5::read`][701], [`h5::write`][702],[`h5::append`][703]
 

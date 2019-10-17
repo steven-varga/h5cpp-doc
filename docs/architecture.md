@@ -1,14 +1,14 @@
 
 # HDF5
 <p align='justify'>
-Within the HDF5 container, datasets maybe stored in [compact, chunked or contiguous](#dataset-creation-property-list) layouts. The  stored datasets are referenced by strings separated with backslash character: `/`.
-The directory entries (non-leaf nodes) are called groups `h5::gr_t`, and the leaf nodes are the datasets `h5::ds_t` and named types `h5::dt_t`. Groups, datasets and named types can have `h5::att_t` attributes attached. At first glance the HDF5 appears as a regular file system with a rich set of API calls.
+Within an HDF5 container, datasets may be stored in [compact, chunked or contiguous](#dataset-creation-property-list) layouts. The  stored datasets are referenced by strings separated with backslash character: `/`.
+The directory entries (non-leaf nodes) are called groups `h5::gr_t`, and the (terminal) leaf nodes are the datasets `h5::ds_t` and named types `h5::dt_t`. Groups, datasets and named types can have `h5::att_t` attributes attached. At first glance, an HDF5 container appears as a regular file system with a rich set of API calls.
 </p>
 ## Layouts
 #### Chunked Layout and Partial IO
-An economic way to access massive data sets is to break them into smaller blocks or chunks. While the CAPI supports complex selection of regions for now H5CPP provides only economical means for sub-setting with `h5::block{}`, `h5::stride{}`. (1)
+An economic way to access massive data sets is to break them into smaller blocks or chunks. While the CAPI supports complex selections of regions, for now H5CPP provides only effective means for sub-setting with `h5::block{}`, `h5::stride{}`. (1)
 
-Chunked layout may be requested by creating a dataset with `h5::chunk{..}` added to dataset creation property list which will implicitly set `h5::layout_chunked` flag on. 
+Chunked layout may be requested by creating a dataset with `h5::chunk{..}` added to dataset creation property list which will implicitly set the `h5::layout_chunked` flag. 
 
 *The content of `[..]` are other optional dataset properties, `fd` is an opened HDF5 file descriptor of type `ht::fd_t`, `...` denotes omitted size definitions:*
 ```cpp
@@ -16,10 +16,10 @@ h5::ds_t ds = h5::create<double>(fd, "dataset", ...,
 		h5::chunk{4,8} [| h5::fill_value<double>{3} |  h5::gzip{9} ] );
 ```
 
-Let `M` be a supported object type, or a raw memory region. For simplicity we pick an armadillo matrix: `arma::mat M(20,16)` then in order to save data to a larger dataset we need to pass the `M` object, the coordinates and possibly strides and blocks.
-`h5::write( ds,  M, h5::offset{4,8}, h5::stride{2,2} )`. The H5 operator will find the memory location of the object, the datatype and the size, these properties are passed to the underlying IO calls.
+Let `M` be a supported object type, or a raw memory region. For simplicity we pick an armadillo matrix: `arma::mat M(20,16)`. Then, in order to save data to a larger dataset, we need to pass the `M` object, the coordinates and possibly strides and blocks.
+`h5::write( ds,  M, h5::offset{4,8}, h5::stride{2,2} )`. The H5 operator will find the memory location of the object, the datatype and the size, and these properties are then passed to the underlying IO calls.
 
-When working with raw memory pointers, or H5CPP doesn't yet know of the object type, you need to specify the size of the object with `h5::count{..}`. 
+When working with raw memory pointers, or when H5CPP doesn't yet know of the object type, you need to specify the size of the object with `h5::count{..}`. 
 
 **Example:**
 
@@ -27,14 +27,14 @@ When working with raw memory pointers, or H5CPP doesn't yet know of the object t
 h5::write( ds,  M.memptr(), h5::count{5,10} [, ...] );
 ```
 
-The above operations can be expressed in a single line. To create a dataset of the appropriate size for partial IO and some filters, then write the entire content of `M` matrix into the dataset:
+The above operations can be expressed on a single line. To create a dataset of a size appropriate for partial IO, to add a filter, and then to write the entire content of the `M` matrix into the dataset is as simple as this:
 ```cpp
 h5::write(fd, "dataset", M, h5::chunk{4,8} | h5::fill_value<double>{3} |  h5::gzip{9} );
 ```
-To learn more about [through examples click here](examples.md).
+To learn more about this topic [through examples click here](examples.md).
 
 
-(1) *The rational behind the decision is simplicity. Sub-setting requires to load data from disk to memory, then filter out the selected data which doesn't lead to IO bandwidth saving, but adds complexity.*
+(1) *The rationale behind the decision is simplicity. Sub-setting requires to load data from disk to memory and then filter out the selected data, which doesn't lead to IO bandwidth savings, but adds complexity.*
 
 
 
