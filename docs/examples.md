@@ -73,4 +73,4 @@ to change the data set transparently before loading, or saving.
 
 
 
-[101]: http://davis.lbl.gov/Manuals/HDF5-1.8.7/UG/13_Attributes.html
+[101]: examples/attributes.md 

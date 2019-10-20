@@ -43,9 +43,8 @@ To learn more about [through examples click here](examples.md).
 
 
 
-#### Contiguous Layout and IO Access: continuous layout
-The simplest form of IO is to read a dataset entirely into memory, or write it to the disk. The upside is to reduce overhead when working with large amount of small size dataset. Indeed, when objects are saved in single IO op and no filtering is specified, H5CPP will choose this access pattern.  The downside of simplicity is lack of filtering. This layout is handy for small datasets.
-
+#### Contiguous Layout and IO Access
+The simplest form of IO is to read a dataset entirely into memory, or write it to the disk. The upside is to reduce overhead when working with large amount of small size dataset. Indeed, when objects are saved in single IO op and no filtering is specified, H5CPP will choose this access pattern.  The downside of simplicity is lack of filtering.
 **Example:** in the simplest case, `h5::write` will open `arma.h5` with write access, then creates a data set with the right dimensions, and commences data transfer.
 ```
 arma::vec V( {1.,2.,3.,4.,5.,6.,7.,8.});
@@ -107,11 +106,12 @@ In the next sections we guide you through H5CPP's CRUD like operators: `h5::crea
 The function calls are given in EBNF notation and we start with a few common tokens.
 
 
-Think of HDF5 as a container, or an image of a file system with a non-POSIX API to access its content. These containers/images may be passed around with standard file operations between computers, while the content may be retrieved with HDF5 specific IO calls. To reference a container within a file-system you either need to pass an open file descriptor `h5::fd_t` or the full path to the HDF5 file:
+Think of HDF5 as a container, or an image of a file system with a non-POSIX API to access its content. These containers/images may be passed around with standard file operations between computers, while the content may be retrieved with HDF5 specific IO calls. To reference a container within a file-system you either need to pass an opened file descriptor `h5::fd_t`, a group/directory descriptor `h5::gr_t` or the full path to the HDF5 file:
 ```cpp
-file ::= const h5::fd_t& fd | const std::string& file_path;
+file ::= const h5::gr_t | const h5::fd_t& fd | const std::string& file_path;
 ```
 
+HDF5 groups `h5::gr_t` are similar to file system directories: a placeholder for objects or sub groups, therefore in this documentation the words `group` and `directory` are interchangeable. Groups similarly to datasets may be decorated with attributes.
 
 An HDF5 Dataset is an object within the container, and to uniquely identify one you either have to pass an open dataset-descriptor `h5::ds_t` or tell the 
 system where to find the container, and the dataset within. In the latter case the necessary shim code is generated to obtain `h5::fd_t` descriptor at compile time.
@@ -119,8 +119,6 @@ system where to find the container, and the dataset within. In the latter case t
 dataset ::= (const h5::fd_t& fd | 
 	const std::string& file_path, const std::string& dataset_path ) | const h5::ds_t& ds;
 ```
-
-
 
 
 HDF5 datasets may take up various shapes and sizes in memory and on disk. A **dataspace** is a descriptor to specify the current size of the object, and if is capable of growing:
@@ -138,8 +136,14 @@ The [previous section](#pythonic-syntax) explained the EBNF tokens: `file`,`data
 [file]
 h5::fd_t h5::open( const std::string& path,  H5F_ACC_RDWR | H5F_ACC_RDONLY [, const h5::fapl_t& fapl] );
 
+[group]
+h5::gr_t h5::gopen( const h5::fd_t | h5::gr_t& location, const std::string& path [, const h5::gapl_t& gapl] );
+
 [dataset]
-h5::ds_t h5::open( const  h5::fd_t& fd, const std::string& path [, const h5::dapl_t& dapl] )
+h5::ds_t h5::open( const h5::fd_t | h5::gr_t& location, const std::string& path [, const h5::dapl_t& dapl] );
+
+[attribute]
+h5::at_t h5::aopen(const h5:ds_t | h5::gr_t& node, const std::string& name [, const & acpl] );
 ```
 Property lists are:  [`h5::fapl_t`][602],  [`h5::dapl_t`][605]. The flags are useful for multiple reader single writer paradigm, only a single process may open an HDF5 file for write at a time.
 
@@ -153,11 +157,16 @@ If the exclusive write is a restriction for you, check out parallel HDF5, where 
 [file]
 h5::fd_t h5::create( const std::string& path, H5F_ACC_TRUNC | H5F_ACC_EXCL, 
 			[, const h5::fcpl_t& fcpl] [, const h5::fapl_t& fapl]);
+
 [dataset]
-template <typename T> h5::ds_t h5::create<T>( file, const std::string& dataset_path, dataspace, 
-	[, const h5::lcpl_t& lcpl] [, const h5::dcpl_t& dcpl] [, const h5::dapl_t& dapl]  );
+template <typename T> h5::ds_t h5::create<T>( 
+	const h5::fd_t | const h5::gr_t& location, const std::string& dataset_path, dataspace, 
+	[, const h5::lcpl_t& lcpl] [, const h5::dcpl_t& dcpl] [, const h5::dapl_t& dapl] );
+
 [attribute]
-	..TBD..
+template <typename T>
+h5::at_t acreate<T>( const h5::ds_t | h5::gr_t& node, const std::string& name
+	 [, const h5::current_dims{...} ] [, const h5::acpl_t& acpl]);
 ```
 Property lists are: [`h5::fcpl_t`][601], [`h5::fapl_t`][602], [`h5::lcpl_t`][603], [`h5::dcpl_t`][604], [`h5::dapl_t`][605]
 
@@ -187,12 +196,18 @@ without temporaries.
 
 Keep in mind that the underlying HDF5 system always reserves a chunk size buffer for data transfer, usually for filtering and or data conversion. Nevertheless this data transfer buffer is minimal -- as under ideal conditions the chunks should be not more than the level 3 cache size of the processor.
 ```cpp
-template <typename T> T h5::read( dataset
+[dataset]
+template <typename T> T h5::read( const h5::ds_t& ds
 	[, const h5::offset_t& offset]  [, const h5::stride_t& stride] [, const h5::count_t& count]
 	[, const h5::dxpl_t& dxpl ] ) const;
-template <typename T> h5::err_t h5::read( dataset, T& ref 
+template <typename T> h5::err_t h5::read( const h5::ds_t& ds, T& ref 
 	[, const [h5::offset_t& offset]  [, const h5::stride_t& stride] [, const h5::count_t& count]
-	[, const h5::dxpl_t& dxpl ] ) const;						 
+	[, const h5::dxpl_t& dxpl ] ) const;
+
+[attribute]
+template <typename T> T aread( const h5::ds_t | h5::gr_t & node, 
+	const std::string& name [, const h5::acpl_t& acpl]) const;
+template <typename T> T aread( const h5::at_t& attr [, const h5::acpl_t& acpl]) const;
 ```
 Property lists are: [`dxpl_t`][606]
  
@@ -221,10 +236,17 @@ There are two kind of operators:
 Keep in mind that the underlying HDF5 system always reserves a chunk size buffer for data transfer, usually for filtering and or data conversion. Nevertheless this data transfer buffer is minimal -- as under ideal conditions the chunks should be not more than the level 3 cache size of the processor.
 
 ```cpp
-template <typename T> h5::err_t h5::write( dataset,  const T& ref
+[dataset]
+template <typename T> void h5::write( dataset,  const T& ref
 	[,const h5::offset_t& offset] [,const h5::stride_t& stride]  [,const& h5::dxcpl_t& dxpl] );
-template <typename T> h5::err_t h5::write( dataset, const T* ptr
+template <typename T> void h5::write( dataset, const T* ptr
 	[,const hsize_t* offset] [,const hsize_t* stride] ,const hsize_t* count [, const h5::dxpl_t dxpl ]);
+
+[attribute]
+template <typename T> void awrite( const h5::ds_t& | const h5::gr_t& node, 
+	const std::string &name, const T& obj  [, const h5::acpl_t& acpl]);
+template <typename T> void awrite( const h5::at_t& attr, const T& obj [, const h5::acpl_t& acpl]);
+
 ```
 Property lists are:  [`dxpl_t`][606]
 
@@ -337,6 +359,9 @@ namespace impl {
 }
 ```
 
+### TODO
+Add operators for other object types, as well as assignment operator should trigger an `aread`
+
 
 # Supported Objects
 
@@ -392,7 +417,7 @@ ublas {.data().begin()}  {n/a}             {size2():1, size1():0}
 dlib  {&ref(0,0)}        {size()}          {nc():1,    nr():0}
 ```
 
-
+Here is a link to [comprehensive list][108] of linear algebra systems by netlib
 
 #### Storage Layout: [Row / Column ordering][200]
 H5CPP guarantees zero copy, platform and system independent correct behaviour between supported linear algebra Matrices.
@@ -402,7 +427,21 @@ Currently there is no easy way to automatically transpose column major matrix su
 do the actual transpose operation when loading/saving the matrix by a custom filter. The alternative is to mark the object as transposed, following BLAS strategy. The latter approach has minimal approach on performance, but requires cooperation from other library writers. Unfortunatelly the HDF5 CAPI doesn't support either of them. Nevertheless **manual transpose** always works, and is supported by most linear algebra systems.
 
 #### Sparse Matrices/Vectors
-Compressed Sparse Row ([CSR][csr]) and Compressed Sparse Column ([CSC][csc]) formats will be supported. The actual storage format may be multi objects inside a `h5::gr_t` group, or a single compound data type as a place holder for the indices and actual data. Special structures such as block diagonal, tri diagonal, triangular are not yet supported. Nevertheless will follow BLAS/LAPACK storage layout whenever possible.
+Netlib considers the following [sparse storage formats][109]:
+
+|description                             | `h5::dapl_t`        |
+|--------------------|:----------------------------------------|
+|[Compressed Sparse Row][110]            | `h5::sparse::csr`   |
+|[Compressed Sparse Column][111]         | `h5::sparse::csc`   |
+|[Block Compressed Sparse Storage][112]  | `h5::sparse::bcrs`  |
+|[Compressed Diagonal Storage][113]      | `h5::sparse::cds`   |
+|[Jagged Diagonal Storage][114]          | `h5::sparse::jds`   |
+|[Skyline Storage][115]                  | `h5::sparse::ss`    |
+
+As of 2019-Oct-16: Compressed Sparse Row ([CSR][csr]) and Compressed Sparse Column ([CSC][csc]) formats are available.
+
+
+The actual storage format may be multi objects inside a `h5::gr_t` group, or a single compound data type as a place holder for the indices and actual data. Special structures such as block diagonal, tri diagonal, triangular are not yet supported. Nevertheless will follow BLAS/LAPACK storage layout whenever possible.
 
 
 ### The STL
@@ -527,7 +566,7 @@ GROUP "/" {
 Parallel Filesystems 
 
 # Type System
-In the core of H5CPP there lies the type mapping mechanism to HDF5 NATIVE types. All type requests are redirected to this segment in one way or another. That includes supported vectors, matrices, cubes, C like structs etc. While HDF5 internally supports type translations among various binary representation H5CPP restricts type handling to the most common case where the program intended to run. This is not in violation of HDF5 use-anywhere policy, just type conversion is delegated to hosts with different binary representation. Since the most common processors are Intel and AMD this approach has the advantage of skipping any conversion.
+In the core of H5CPP there lies the type mapping mechanism to HDF5 NATIVE types. All type requests are redirected to this segment in one way or another. That includes supported vectors, matrices, cubes, C like structs etc. While HDF5 internally supports type translations among various binary representation H5CPP deals only on native types. This is not in violation of HDF5 use-anywhere policy, just type conversion is delegated to hosts with different binary representation. Since the most common processors are Intel and AMD this approach has the advantage of skipping any conversion. In other words H5CPP is using NATIVE types.
 
 ```yacc
 integral 		:= [ unsigned | signed ] [int_8 | int_16 | int_32 | int_64 | float | double ] 
@@ -1033,6 +1072,7 @@ In order to execute install  `google-pprof` and `kcachegrind`.
 [csr]: https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_row_(CSR,_CRS_or_Yale_format)
 [csc]: https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_column_(CSC_or_CCS)
 [not-implemented]: #not-implemented
+
 [1]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5I.html#Identify-IncRef
 [2]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5I.html#Identify-DecRef
 [3]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5I.html#Identify-GetRef
@@ -1051,6 +1091,15 @@ In order to execute install  `google-pprof` and `kcachegrind`.
 [105]: http://dlib.net/linear_algebra.html
 [106]: https://bitbucket.org/blaze-lib/blaze
 [107]: https://github.com/wichtounet/etl
+[108]: http://www.netlib.org/utk/people/JackDongarra/la-sw.html
+[109]: http://www.netlib.org/utk/people/JackDongarra/etemplates/node372.html
+[110]: http://www.netlib.org/utk/people/JackDongarra/etemplates/node373.html
+[111]: http://www.netlib.org/utk/people/JackDongarra/etemplates/node374.html
+[112]: http://www.netlib.org/utk/people/JackDongarra/etemplates/node375.html
+[113]: http://www.netlib.org/utk/people/JackDongarra/etemplates/node376.html
+[114]: http://www.netlib.org/utk/people/JackDongarra/etemplates/node377.html
+[115]: http://www.netlib.org/utk/people/JackDongarra/etemplates/node378.html
+
 
 [200]: https://en.wikipedia.org/wiki/Row-_and_column-major_order
 [201]: https://en.wikipedia.org/wiki/Row-_and_column-major_order#Transposition
