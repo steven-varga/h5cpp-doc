@@ -157,7 +157,10 @@ If the exclusive write is a restriction for you, check out parallel HDF5, where 
 [file]
 h5::fd_t h5::create( const std::string& path, H5F_ACC_TRUNC | H5F_ACC_EXCL, 
 			[, const h5::fcpl_t& fcpl] [, const h5::fapl_t& fapl]);
-
+[group]
+h5::fd_t h5::gcreate( const h5::fd_t | const h5::gr_t, const std::string& name
+			[, const h5::lcpl_t& lcpl] [, const h5::gcpl_t& gcpl] [, const h5::gapl_t& gapl]);
+	
 [dataset]
 template <typename T> h5::ds_t h5::create<T>( 
 	const h5::fd_t | const h5::gr_t& location, const std::string& dataset_path, dataspace, 
@@ -245,7 +248,7 @@ template <typename T> void h5::write( dataset, const T* ptr
 [attribute]
 template <typename T> void awrite( const h5::ds_t& | const h5::gr_t& node, 
 	const std::string &name, const T& obj  [, const h5::acpl_t& acpl]);
-template <typename T> void awrite( const h5::at_t& attr, const T& obj [, const h5::acpl_t& acpl]);
+template <typename T> void awrite( const h5::at_t& attr, const T* ptr [, const h5::acpl_t& acpl]);
 
 ```
 Property lists are:  [`dxpl_t`][606]
@@ -1045,10 +1048,14 @@ only the following objects:
 * h5::dt_t
 * h5::pt_t
 * h5::sp_t
-* h5::
+
+**TODO:** finish article, add implementation for all objects
+
+## Performance
+**TODO:** write and run tests
 
 
-### Performance
+
 |    experiment                               | time  | trans/sec | Mbyte/sec |
 |:--------------------------------------------|------:|----------:|----------:|
 |append:  1E6 x 64byte struct                 |  0.06 |   16.46E6 |   1053.87 |
@@ -1062,6 +1069,38 @@ Lenovo 230 i7 8G ram laptop on Linux Mint 18.1 system
 
 **gprof** directory contains [gperf][1] tools base profiling. `make all` will compile files.
 In order to execute install  `google-pprof` and `kcachegrind`.
+
+
+
+## Source Code Structure
+Follows HDF5 CAPI naming conventions with some minor additions to facilitate linear algebra inclusion as well as compile time reflection.
+
+* **H5F**: File-level access routines.
+* **H5G**: Group functions, for creating and operating on groups of objects.
+* **H5T**: DataType functions, for creating and operating on simple and compound datatypes to be used as the elements in data arrays.
+* **H5S**: DataSpace functions, which create and manipulate the dataspace in which the elements of a data array are stored.
+* **H5D**: Dataset functions, which manipulate the data within datasets and determine how the data is to be stored in the file.
+* **H5P**: Property list functions, for manipulating object creation and access properties.
+* **H5A**: Attribute access and manipulating routines.
+* **H5Z**: Compression registration routine.
+* **H5E**: Error handling routines.
+* **H5I**: Identifier routine.
+* **H5M**: Meta descriptors for linear algebra objects
+
+When POD struct are used, the type description  must be sandwiched between the `core` and `io` calls.
+
+* **core**: all routines with the exception of IO calls
+* **io** : only IO routines are included, necessary when type definitions are sandwiched
+* **all**: all header files are included
+
+Miscellaneous routines are:
+
+* **compat.hpp** to mitigate differences between C++11 and c++17
+* **H5capi.hpp** to manage error handling 
+* **H5config.hpp** definitions to control H5CPP behaviour
+* **H5cout.hpp** IO stream routines for H5CPP objects, **TODO:** work in progress
+
+
 
 [create]: index.md#create
 [read]:   index.md#read

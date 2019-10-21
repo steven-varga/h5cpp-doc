@@ -34,7 +34,6 @@ ds["pressure"] = 0.5;
 * Attributes cannot be shared
 * Attributes cannot have attributes
 * Being small, an attribute is stored in the object header of the object it describes and is thus attached directly to that object
-* The “Special Issues” section below describes how to handle attributes that are large in size and how to handle large numbers of attributes.
 
 ### Objects
 ```yacc
@@ -56,7 +55,7 @@ T ::= scalar | vector | initializer_list | linalg
 
 #### Single Objects
 ```cpp
-parent ::= h5::gr_t | h5::ds_t | h5::dt_t;
+parent ::= h5::gr_t | h5::ds_t | h5::dt_t | h5::at_t;
 
 [open]
 h5::at_t h5::aopen(parent, const std::string& name [, const & acpl] );
@@ -67,11 +66,9 @@ h5::at_t acreate<T>( parent, const std::string& name
 
 [read]
 T aread( parent, const std::string& name [, const h5::acpl_t& acpl]) const;
-T aread( const h5::at_t& attr [, const h5::acpl_t& acpl]) const;
 
 [write]
 void awrite( parent, const std::string &name, const T& obj  [, const h5::acpl_t& acpl]);
-void awrite( const h5::at_t& attr, const T& obj [, const h5::acpl_t& acpl]);
 ```
 
 #### Multiple Objects

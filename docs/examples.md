@@ -1,9 +1,23 @@
 ### About Examples
 You find examples for most implemented features on the project github page, or when installed from package manager in `/usr/local/share/h5cpp`. Only a `cmake`, a C++17 compatible tool-chain and the HDF5 libraries are required to run them. The examples not only `cmake` but traditional make files as well.
 
+### [container][11]
+Demonstrates how to create and manipulate HDF5 containers within H5CPP
+ [read on HDF5 container here][104].
+
+### [groups][10]
+Datasets within HDF5 containers similarly to other file-systems are addressed by a tree like data structure, each node in the path is called a group these examples help you how to manipulate the groups, including adding attributes.
+You can [read on groups here][102].
+
+### [datasets][10]
+This example guides you how to create HDF5 datasets, and control its properties. You can [read on datasets here][103].
 
 ### [attributes][10]
 Objects may have additional information attached to them, called attributes, currently only datasets `h5::ds_t` are supported, but at some point this will be extended to `h5::gr_t` and `h5::dt_t` as well. Since the attributes are saved in the metadata section in the HDF5 container the space is limited. You can [read on attributes here][101].
+
+
+
+
 
 ### [basics][11]
 Demonstrates data descriptors, their properties and how to work with them.
@@ -74,3 +88,6 @@ to change the data set transparently before loading, or saving.
 
 
 [101]: examples/attributes.md 
+[102]: examples/groups.md 
+[103]: examples/datasets.md 
+[104]: examples/container.md 
