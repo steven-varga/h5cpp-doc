@@ -15,8 +15,9 @@ This example guides you how to create HDF5 datasets, and control its properties.
 ### [attributes][10]
 Objects may have additional information attached to them, called attributes, currently only datasets `h5::ds_t` are supported, but at some point this will be extended to `h5::gr_t` and `h5::dt_t` as well. Since the attributes are saved in the metadata section in the HDF5 container the space is limited. You can [read on attributes here][101].
 
-
-
+### [sparse][11]
+Sparse matrices are ubiquitous in engineering, for low fill rate matrices various storage formats are explored
+[read on sparse matrices here][105].
 
 
 ### [basics][11]
@@ -91,3 +92,4 @@ to change the data set transparently before loading, or saving.
 [102]: examples/groups.md 
 [103]: examples/datasets.md 
 [104]: examples/container.md 
+[105]: examples/sparse-matrix.md 
