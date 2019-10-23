@@ -452,7 +452,7 @@ GROUP "/" {
 
 
 # Type System
-At the heart of H5CPP lies the type mapping mechanism to HDF5 NATIVE types. All type requests are redirected to this segment in one way or another. That includes supported vectors, matrices, cubes, C like structs, etc. While HDF5 internally supports type translations among various binary representation, H5CPP restricts type handling to the most common case where the program intended to run. This is not in violation of HDF5 use-anywhere policy, just type conversion is delegated to hosts with different binary representation. Since the most common processors are Intel and AMD, this approach has the advantage of skipping any conversion.
+At the heart of H5CPP lies the type mapping mechanism to HDF5 NATIVE types. All type requests are redirected to this segment in one way or another. That includes supported vectors, matrices, cubes, C like structs, etc. While HDF5 internally supports type translations among various binary representation, H5CPP deals only with native types. This is not a violation of the HDF5 use-anywhere policy, only type conversion is delegated to hosts with different binary representations. Since the most common processors are Intel and AMD, with this approach conversion is unnescessary most of the time. In summary, H5CPP uses NAIVE types exclusively.
 
 ```yacc
 integral 		:= [ unsigned | signed ] [int_8 | int_16 | int_32 | int_64 | float | double ] 
@@ -508,7 +508,7 @@ Record/POD struct types are registered through this macro:
 **FYI:** there are no other public/unregistered macros other than `H5CPP_REGISTER_STRUCT`
 
 ### Using CAPI Functions
-By default the `hid_t` type automatically is converted to / from H5CPP `h5::hid_t<T>` templated identifiers. All HDF5 CAPI types are wrapped into `h5::impl::hid_t<T>` internal template, keeping binary compatibility, with the exception of `h5::pt_t` packet table handle.
+By default the `hid_t` type is automatically converted to / from H5CPP `h5::hid_t<T>` templated identifiers. All HDF5 CAPI identifiers are wrapped via the `h5::impl::hid_t<T>` internal template, maintaining binary compatibility, with the exception of `h5::pt_t` packet table handle.
 ```yacc
 T := [ file_handles | property_list ]
 file_handles   := [ fd_t | ds_t | att_t | err_t | grp_t | id_t | obj_t ]
@@ -529,13 +529,13 @@ object  := [ h5::ocpl_t                           | h5::ocpyl_t ]
 
 The functions, macros, and subroutines listed here are used to manipulate property list objects in various ways, including to reset property values. With the use of property lists, HDF5 functions have been implemented and can be used in applications with fewer parameters than would be required without property lists, this mechanism is similar to [POSIX fcntl][700]. Properties are grouped into classes, and each class member may be daisy chained to obtain a property list.
 
-To give you an example how to obtain a data creation property list with chunk, fill value, shuffling, nbit, fletcher23 filters and gzip compression set:
+Here is an example of how to obtain a data creation property list with chunk, fill value, shuffling, nbit, fletcher32 filters and gzip compression set:
 ```cpp
 h5::dcpl_t dcpl = h5::chunk{2,3} 
 	| h5::fill_value<short>{42} | h5::fletcher32 | h5::shuffle | h5::nbit | h5::gzip{9};
 auto ds = h5::create("container.h5","/my/dataset.dat", h5::create_path | h5::utf8, dcpl, h5::default_dapl);
 ```
-Properties may be passed in arbitrary order, by reference, or directly by daisy chaining them. A list of property descriptors:
+Properties may be passed in arbitrary order, by reference, or directly by daisy chaining them. The following property list descriptors are available:
 ```yacc
 #            create       access       transfer     copy 
 file    := [ h5::fcpl_t | h5::fapl_t                            ] 
@@ -549,11 +549,11 @@ object  := [ h5::ocpl_t                           | h5::ocpyl_t ]
 ```
 
 #### Default Properties:
-set to  value (different from HDF5 CAPI):
+Set to a non-default value (different from HDF5 CAPI):
 
 * `h5::default_lcpl =  h5::utf8 | h5::create_intermediate_group;`
 
-set to zero (same as HDF5 CAPI):
+Reset to default (same as HDF5 CAPI):
 
 * `h5::default_acpl`, `h5::default_dcpl`, `h5::default_dxpl`, `h5::default_fapl`,  `h5::default_fcpl`
 
@@ -561,16 +561,16 @@ set to zero (same as HDF5 CAPI):
 ## File Operations
 #### [File Creation Property List][1001]
 ```cpp
-// you may pass CAPI property list descriptors daisy chained with '|' operator 
+// you may pass CAPI property list descriptors whose properties are daisy chained with the '|' operator 
 auto fd = h5::create("002.h5", H5F_ACC_TRUNC, 
 		h5::file_space_page_size{4096} | h5::userblock{512},  // file creation properties
 		h5::fclose_degree_weak | h5::fapl_core{2048,1} );     // file access properties
 ```
 
-* [`h5::userblock{hsize_t}`][1001] sets the user block size of a file creation property list
+* [`h5::userblock{hsize_t}`][1001] Sets the user block size of a file creation property list
 * [`h5::sizes{size_t,size_t}`][1002] Sets the byte size of the offsets and lengths used to address objects in an HDF5 file.
 * [`h5::sym_k{unsigned,unsigned}`][1003] Sets the size of parameters used to control the symbol table nodes.
-* [`h5::istore_k{unsigned}`][1004] Sets the size of the parameter used to control the B-trees for indexing chunked dataset.
+* [`h5::istore_k{unsigned}`][1004] Sets the size of the parameter used to control the B-trees for indexing chunked datasets.
 * [`h5::file_space_page_size{hsize_t}`][1005] Sets the file space page size for a file creation property list.
 * [`h5::file_space_page_strategy{H5F_fspace_strategy_t strategy, hbool_t persist, hsize_t threshold}`][1010] Sets the file space handling strategy and persisting free-space values for a file creation property list. <br/>
 * [`h5::shared_mesg_nindexes{unsigned}`][1007] Sets number of shared object header message indexes.
@@ -748,11 +748,12 @@ In addition to CAPI properties, a custom `high_throughput` property is added, to
 
 ### RAII 
 
-There are c++ mapping for  `hid_t` id-s which reference objects with `std::shared_ptr` type of behaviour with HDF5 CAPI internal reference
-counting. For further details see [H5inc_ref][1], [H5dec_ref][2] and [H5get_ref][3]. The internal representation of these objects is binary compatible of the CAPI hid_t and interchangeable depending on the conversion policy:
+There is a C++ mapping for `hid_t` id-s, which reference objects, with `std::shared_ptr` type of behaviour with HDF5 CAPI internal reference counting.
+
+ For further details see [H5Iinc_ref][1], [H5Idec_ref][2] and [H5Iget_ref][3]. The internal representation of these objects is binary compatible with the CAPI `hid_t` and interchangeable depending on the conversion policy:
 	`H5_some_function( static_cast<hid_t>( h5::hid_t id ), ...   )`
-Direct initialization `h5::ds_t{ some_hid }` bypasses reference counting, and is intended to for use case where you have to take ownership
-of a CAPI hid_t object reference. This is equivalent behaviour to `std::shared_ptr`, when object destroyed reference count is decreased.
+Direct initialization `h5::ds_t{ some_hid }` bypasses reference counting, and is intended for use cases where you have to take ownership
+of an CAPI `hid_t` object handle. This is equivalent behaviour to `std::shared_ptr`, where a referenced object is destroyed when its reference count reaches 0.
 ```cpp
 {
 	h5::ds_t ds = h5::open( ... ); 
@@ -761,11 +762,11 @@ of a CAPI hid_t object reference. This is equivalent behaviour to `std::shared_p
 
 ### Error handling 
 
-Error handling follows the C++ [Guidline][11] and the philosophy H5CPP library is built around, that is to  help you to start without reading much of the documentation, and providing ample of room for more should you require it. The root of exception tree is: `h5::error::any` derived from std::`runtime_exception` in accordance with C++ guidelines [custom exceptions][12]. 
-All HDF5 CAPI calls are considered as resource, and in case of error H5CPP aims to roll back to last known stable state, cleaning up all resource allocations between the call entry and thrown error. This mechanism is guaranteed by RAII. 
+Error handling follows the C++ [Guidline][11] and the H5CPP "philosophy" which is to  help you to get started without reading a lot of documentation, and to provide ample room for more should you require it. The root of the exception tree is: `h5::error::any` derived from std::`runtime_exception` in accordance with the C++ guidelines [custom exceptions][12]. 
+All HDF5 CAPI calls are considered resources, and, in case of an error, H5CPP aims to roll back to the last known stable state while cleaning up all resource allocations between the call entry and the thrown error. This mechanism is guaranteed by RAII. 
 
-For granularity `io::[file|dataset|attribute]` exceptions provided, with the pattern to capture the entire subset by `::any`.
-Exceptions thrown with error massages  \__FILE\__ and \__LINE\__ relevant to H5CPP template library with a brief description to help the developer to investigate. This error reporting mechanism uses a macro found inside **h5cpp/config.h** and maybe redefined:
+For granularity `io::[file|dataset|attribute]` exceptions are provided, with the pattern to capture the entire subset by `::any`.
+Exceptions are thrown with error messages, \__FILE\__ and \__LINE\__ relevant to H5CPP template library, with a brief description to help the developer to investigate. This error reporting mechanism uses a macro found inside **h5cpp/config.h** and maybe redefined:
 ```cpp
 	...
 // redefine macro before including <h5cpp/ ... >
@@ -774,7 +775,7 @@ Exceptions thrown with error massages  \__FILE\__ and \__LINE\__ relevant to H5C
 #include <h5cpp/all> 
 	...
 ```
-An example to capture and handle errors centrally:
+Here is an example of how to capture and handle errors centrally:
 ```cpp
 	// some H5CPP IO routines used in your software
 	void my_deeply_embedded_io_calls() {
@@ -799,9 +800,9 @@ An example to capture and handle errors centrally:
 		}
 	}
 ```
-Detailed CAPI error stack may be unrolled and dumped, muted, unmuted with provided methods:
+The detailed CAPI error stack may be unrolled and dumped, muted, unmuted with the provided methods:
 
-* `h5::mute`   - saves current HDF5 CAPI error handler to thread local storage and replaces it with NULL handler, getting rid of all error messages produced by CAPI. CAVEAT: lean and mean, therefore no nested calls are supported. Should you require more sophisticated handler keep reading on.
+* `h5::mute`   - saves current HDF5 CAPI error handler to thread local storage and replaces it with the `NULL` handler, getting rid of all error messages produced by the CAPI. CAVEAT: lean and mean, therefore no nested calls are supported. Should you require more sophisticated handler keep on reading.
 * `h5::unmute` - restores previously saved error handler, error messages are handled according to previous handler.
 
 usage:
@@ -812,8 +813,7 @@ usage:
 	h5::unmute(); 
 ```
 
-* `h5::use_errorhandler()` - captures ALL CAPI error messages into thread local storage, replacing current CAPI error handler
-comes handy when you want to provide details of error happened. 
+* `h5::use_errorhandler()` - captures ALL CAPI error messages into thread local storage, replacing current CAPI error handler. This comes in handy when you want to provide details of how the error happened. 
 
 `std::stack<std::string> h5::error_stack()` - walks through underlying CAPI error handler
 
@@ -838,12 +838,12 @@ usage:
 **Design criteria**
 - All HDF5 CAPI calls are checked with the only exception of `H5Lexists` where the failure carries information, that the path does not exist yet. 
 - Callbacks of CAPI routines doesn't throw any exceptions, honoring the HDF5 CAPI contract, hence allowing the CAPI call to clean up
-- Error messages currently are collected in `H5Eall.hpp` may be customized
+- Error messages currently are collected in `H5Eall.hpp` and may be customized
 - Thrown exceptions are hierarchical
-- Only RAII capable/wrapped objects used, guaranteed cleanup through stack unrolling
+- Only RAII capable/wrapped objects are used, and are guaranteed to clean up through stack unrolling
 
-Exception hierarchy is embedded in namespaces, the chart should be interpreted as tree, for instance a file create exception is
-`h5::error::io::file::create`. Keep in mind [namespace aliasing][3] allow you customization should you find the long names inconvenient:
+The exception hierarchy is embedded in namespaces, the chart should be interpreted as a tree, for instance a file create exception is
+`h5::error::io::file::create`. Keep [namespace aliasing][3] in mind, which allows you to customize these matters, should you find the long names inconvenient:
 ```cpp
 using file_error = h5::error::io::file
 try{
@@ -893,7 +893,7 @@ This is a work in progress, if for any reasons you think it could be improved, o
 
 
 ### Diagnostics  
-On occasions it comes handy to dump internal state of objects, while currently only `h5::sp_t` data-space descriptor and dimensions supported
+On occasions it comes in handy to dump the internal state of objects, while currently only `h5::sp_t` data-space descriptor and dimensions supported
 in time most of HDF5 CAPI diagnostics/information calls will be added.
 
 ```cpp
@@ -909,7 +909,7 @@ in time most of HDF5 CAPI diagnostics/information calls will be added.
 
 ### stream operators
 Some objects implement `operator<<` to furnish you with diagnostics. In time all objects will the functionality added, for now
-only the following objects:
+only the following objects are supported:
 
 * h5::current_dims_t
 * h5::max_dim_t
