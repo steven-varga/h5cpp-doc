@@ -61,6 +61,10 @@ a brief [example][30] on how to save a set of strings with `h5::utf8` encoding
 simple example how to transform/change data within the data transfer buffer of the HDF5 C library. This feature is 
 to change the data set transparently before loading, or saving.
 
+### [google test][400]
+Integrity tests are with `google-test` framework and placed under `test/` directory
+
+
 [10]: https://github.com/steven-varga/h5cpp/tree/master/examples/attributes
 [11]: https://github.com/steven-varga/h5cpp/tree/master/examples/basics
 [12]: https://github.com/steven-varga/h5cpp/tree/master/examples/before-after
@@ -92,4 +96,6 @@ to change the data set transparently before loading, or saving.
 [102]: examples/groups.md 
 [103]: examples/datasets.md 
 [104]: examples/container.md 
-[105]: examples/sparse-matrix.md 
+[105]: examples/sparse-matrix.md
+
+[400]: test.md 

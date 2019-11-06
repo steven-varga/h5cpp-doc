@@ -166,7 +166,7 @@ template <typename T> h5::ds_t h5::create<T>(
 
 [attribute]
 template <typename T>
-h5::at_t acreate<T>( const h5::ds_t | h5::gr_t& node, const std::string& name
+h5::at_t acreate<T>( const h5::ds_t | const h5::gr_t& | const h5::dt_t& node, const std::string& name
 	 [, const h5::current_dims{...} ] [, const h5::acpl_t& acpl]);
 ```
 Property lists are: [`h5::fcpl_t`][601], [`h5::fapl_t`][602], [`h5::lcpl_t`][603], [`h5::dcpl_t`][604], [`h5::dapl_t`][605]
@@ -206,7 +206,7 @@ template <typename T> h5::err_t h5::read( const h5::ds_t& ds, T& ref
 	[, const h5::dxpl_t& dxpl ] ) const;
 
 [attribute]
-template <typename T> T aread( const h5::ds_t | h5::gr_t & node, 
+template <typename T> T aread( const h5::ds_t& | const h5::gr_t& | const h5::dt_t& node, 
 	const std::string& name [, const h5::acpl_t& acpl]) const;
 template <typename T> T aread( const h5::at_t& attr [, const h5::acpl_t& acpl]) const;
 ```
@@ -227,6 +227,19 @@ try {
 	...
 }
 ```
+Within fast loop, read into a buffer. `h5::count{...}` is computed from `buffer` size at compile time, passing it as argument results in informative compile time assert.
+```cpp
+arma::mat buffer(3,4);
+for(int i=0; i<10'000'000; i++)
+	h5:read(ds, buffer, h5::offset{i+chunk});
+```
+In some cases you have to deal with raw/managed pointers, describe target memory size with `h5::count{...}`:
+```cpp
+std::unique_ptr<double> ptr(new double[buffer_size]);
+for(int i=0; i<10'000'000; i++)
+	h5:read(ds, ptr, h5::offset{i+buffer_size}, h5::count{buffer_size});
+```
+
 
 #### WRITE
 There are two kind of operators:
@@ -244,7 +257,7 @@ template <typename T> void h5::write( dataset, const T* ptr
 	[,const hsize_t* offset] [,const hsize_t* stride] ,const hsize_t* count [, const h5::dxpl_t dxpl ]);
 
 [attribute]
-template <typename T> void awrite( const h5::ds_t& | const h5::gr_t& node, 
+template <typename T> void awrite( const h5::ds_t& | const h5::gr_t& | const h5::dt_t& node, 
 	const std::string &name, const T& obj  [, const h5::acpl_t& acpl]);
 template <typename T> void awrite( const h5::at_t& attr, const T* ptr [, const h5::acpl_t& acpl]);
 
@@ -455,6 +468,30 @@ don't have direct access to the underlying memory store and the provided iterato
 
 * `std::stack`,`std::queue`,`std::priority_queue` are adaptors; the underlying data-structure determines how data transfers take place.
 
+
+
+#### std::strings
+
+HDF5 supports variable- and fixed-length strings. The former is of interest, as the most common way for storing strings in a file: consecutive characters with a separator. The current storage layout is a heap data structure making it less suitable for massive Terabyte-scale storage. In addition, the `std::string` s have to be copied during [read][read] operations. Both filtering, such as `h5::gzip{0-9}`, and encoding, such as `h5::utf8`, are supported.
+<div id="object" style="float: left;">
+	![Object](pix/c-strings-inmemory.png)
+</div>
+#### C Strings
+are actually one-dimensional array of characters terminated by a null character `\0`. Thus a null-terminated string contains the characters that comprise the string followed by a null. Am array of `char*` pointers is to describe a collection of c strings, the memory locations are not required to be
+contiguous. The beginning of the array is a `char**` type.
+
+`h5::write<char**>(fd, char** ptr, h5::current_dims{n_elems}, ...);`
+
+
+
+
+**not supported**: `wchar_t _wchar char16_t _wchar16 char32_t _wchar32`
+
+**TODO:** work out a new efficient storage mechanism for strings.
+
+
+
+
 ### Raw Pointers
 Currently only memory blocks are supported in consecutive/adjacent location of elementary or POD types. This method comes in handy when an object type is not supported. You need to find a way to grab a pointer to its internal datastore and the size, and then pass this as an argument. For [read][read] operations, make sure there is enough memory reserved; for [write][write] operations, you must specify the data transfer size with `h5::count`.
 
@@ -495,13 +532,6 @@ The internal typesystem for POD/Record types supports:
 
 #### C++ Classes
 Work in progress. Requires modification to compiler as well as coordinated effort how to store complex objects such that other platforms capable of reading them.
-
-### Strings
-HDF5 supports variable- and fixed-length strings. The former is of interest, as the most common way for storing strings in a file: consecutive characters with a separator. The current storage layout is a heap data structure making it less suitable for massive Terabyte-scale storage. In addition, the strings have to be copied during [read][read] operations. Both filtering, such as `h5::gzip{0-9}`, and encoding, such as `h5::utf8`, are supported.
-
-**not supported**: `wchar_t _wchar char16_t _wchar16 char32_t _wchar32`
-
-**TODO:** work out a new efficient storage mechanism for strings.
 
 # High Throughput Pipeline
 
@@ -622,11 +652,30 @@ Record/POD struct types are registered through this macro:
 ```
 **FYI:** there are no other public/unregistered macros other than `H5CPP_REGISTER_STRUCT`
 
-### Using CAPI Functions
+### Resource Handles and CAPI Interop
 By default the `hid_t` type is automatically converted to / from H5CPP `h5::hid_t<T>` templated identifiers. All HDF5 CAPI identifiers are wrapped via the `h5::impl::hid_t<T>` internal template, maintaining binary compatibility, with the exception of `h5::pt_t` packet table handle.
+
+
+Here are some properties of descriptors,`h5::ds_t` and `h5::open` are used only for the demonstration, replace them with arbitrary descriptors.
+
+* `h5::ds_t ds` default CTOR, is initialized with `H5I_UNINIT`
+* `h5::ds_t res = h5::open(...)` RVO  with RAII maneged resource `H5Iinc_ref` not called, best way to initialize
+* `h5::ds_t res = std::move(h5::ds_t(...))` move assignment with RAII enabled for each handles, `H5Iinc_ref` called once
+* `h5::ds_t res = h5::ds_t(...)` copy assignment with RAII enabled for each handles, `H5Iinc_ref` called twice, considered inexpensive
+* `h5::ds_t res(hid_t)` creates resource with RAII, increments reference counts of `hid_t` with `H5Iinc_ref` 
+* `h5::ds_t res{hid_t}` create resource without RAII, for managed CAPI handles, try not using it, a full copy of a handle is cheap
+
+The Packet Table interface has an additional conversion CTOR defined from `h5::ds_t` to `h5::pt_t` and is the preffered way to obtain a handle:
+
+* `h5::pt_t pt = h5::open(fd, 'path/to/dataset', ...)` obtains a `h5::ds_t` resource, converts it to `h5::pt_t` type then assigns it to names variable, this process will result in 2 increments to underlying CAPI handle or 2 calls to `H5Iinc_ref`. 
+*  `h5::pt_t pt = h5::ds_t(...)` this pattern is used when creating packet table from existing and opened `h5::ds_t`, resources are copied (not stolen), in other words `h5::ds_t` remains valid after the operation, all state changes will be reflected.
+
+During the lifespan of H5CPP handles all of the underlying HDF5 desciptors are **properly initialized, reference count maintained and closed.**
+
+Resources may be grouped into `handles` and `property_lists`-s. 
 ```yacc
-T := [ file_handles | property_list ]
-file_handles   := [ fd_t | ds_t | att_t | err_t | grp_t | id_t | obj_t ]
+T := [ handles | property_list ]
+handles   := [ fd_t | ds_t | att_t | err_t | grp_t | id_t | obj_t ]
 property_lists := [ file | dataset | attrib | group | link | string | type | object ]
 
 #            create       access       transfer     copy 
@@ -769,13 +818,13 @@ h5::fapl_t fapl = h5::fclose_degree_weak | h5::fapl_core{2048,1} | h5::core_writ
 Filtering properties require `h5::chunk{..}` set to sensible values. Not having set `h5::chunk{..}` set is equal with requesting `h5::layout_contigous` a dataset layout without chunks, filtering and sub-setting capabilities. This layout is useful for single shot read/write operations, and is the prefered method to save small linear algebra objects.
 **Example:**
 ```cpp
-h5::dcpl_t dcpl = h5::chunk{1,4,5} | h5::deflate{4} | h5::layout_compact | h5::dont_filter_partial_chunks
+h5::dcpl_t dcpl = h5::chunk{1,4,5} | h5::deflate{4} | h5::compact | h5::dont_filter_partial_chunks
 		| h5::fill_value<my_struct>{STR} | h5::fill_time_never | h5::alloc_time_early 
 		| h5::fletcher32 | h5::shuffle | h5::nbit;
 ```
 * [`h5::layout{H5D_layout_t layout}`][1501] Sets the type of storage used to store the raw data for a dataset. <br/>
-**Flags:** `h5::layout_compact`, `h5::layout_contigous`, `h5::layout_chunked`, `h5::layout_virtual`
-* [`h5::chunk{...}`][1502] control chunk size, takes in initializer list with rank matching the dataset dimensions
+**Flags:** `h5::compact`, `h5::contigous`, `h5::chunked`, `h5::virtual`
+* [`h5::chunk{...}`][1502] control chunk size, takes in initializer list with rank matching the dataset dimensions, sets `h5::chunked` layout
 * [`h5::chunk_opts{unsigned}`][1503] Sets the edge chunk option in a dataset creation property list.<br/>
 **Flags:** `h5::dont_filter_partial_chunks`
 * [`h5::deflate{0-9}`][1504] | `h5::gzip{0-9}` set deflate compression ratio
@@ -998,6 +1047,14 @@ h5::error : public std::runtime_error
 			::write
 			::append
 			::misc
+      ::packet_table::
+			::any
+			::create
+			::open
+			::close
+			::read
+			::write
+			::misc
       ::attribute::
 			::any
 			::create
@@ -1097,6 +1154,15 @@ Miscellaneous routines are:
 * **H5capi.hpp** to manage error handling 
 * **H5config.hpp** definitions to control H5CPP behaviour
 * **H5cout.hpp** IO stream routines for H5CPP objects, **TODO:** work in progress
+
+
+## Hacking
+
+### Controlling HDF5 `hid_t` 
+H5CPP controls what arguments accepted for various functions calls with `std::enable_if<>::type` mechanism, disabling certain templates being instantiated. The type definition helpers are in `H5std.hpp` file, and here is a brief overview what they do:
+
+* `h5::impl::attr::is_location<class HID_T>::value` checks what handle is considered for attributes as accepted value. By default 
+`h5::gr_t | h5::ds_t | h5::dt_t` are set.
 
 
 
