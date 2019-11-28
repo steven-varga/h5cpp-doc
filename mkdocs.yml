@@ -2,6 +2,7 @@ site_name: H5CPP
 nav:
     - Introduction: index.md
     - Documentation: architecture.md
+    - Type System: typesystem.md
     - Compiler: compiler.md
     - Examples: examples.md
     - Presentations: presentations.md

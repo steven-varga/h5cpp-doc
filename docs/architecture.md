@@ -16,8 +16,8 @@ h5::ds_t ds = h5::create<double>(fd, "dataset", ...,
 ```
 *The content of `[..]` are other optional dataset properties, `fd` is an opened HDF5 file descriptor of type `ht::fd_t`, `...` denotes omitted size definitions*
 
-Let `M` be a supported object type, or a raw memory region. For simplicity we pick an armadillo matrix: `arma::mat M(20,16)`. Then, in order to save data to a larger dataset, we need to pass the `M` object, the coordinates and possibly strides and blocks.
-`h5::write( ds,  M, h5::offset{4,8}, h5::stride{2,2} )`. The H5 operator will find the memory location of the object, the datatype and the size, and these properties are then passed to the underlying IO calls.
+Let `M` be a supported object type, or a raw memory region. For simplicity we pick an armadillo matrix: `arma::mat M(20,16)`. Then, in order to save this matrix into a larger dataspace, we need to pass the `M` , the coordinates and possibly strides and blocks:
+`h5::write( ds,  M, h5::offset{4,8}, h5::stride{2,2} )`. The H5 operator will identify the memory location of the object, the datatype and the size and delegates them to actual  IO calls.
 
 When working with raw memory pointers, or when H5CPP doesn't yet know of the object type, you need to specify the size of the object with `h5::count{..}`. 
 
@@ -34,7 +34,7 @@ h5::write(fd, "dataset", M, h5::chunk{4,8} | h5::fill_value<double>{3} |  h5::gz
 To learn more about this topic [through examples click here](examples.md).
 
 
-(1) *The rationale behind the decision is simplicity. Sub-setting requires to load data from disk to memory and then filter out the selected data, which doesn't lead to IO bandwidth savings, but adds complexity.*
+(1) *The rationale behind the decision is simplicity. Sub-setting requires to load data from disk to memory and then filter out the selected data, which doesn't lead to IO bandwidth savings, yet adds complexity.*
 
 
 
@@ -211,7 +211,7 @@ template <typename T> T aread( const h5::ds_t& | const h5::gr_t& | const h5::dt_
 template <typename T> T aread( const h5::at_t& attr [, const h5::acpl_t& acpl]) const;
 ```
 Property lists are: [`dxpl_t`][606]
- 
+
 **Example:** Let's read a 10x5 matrix from a 3D array from location {3,4,1}
 ```cpp
 #include <armadillo>
@@ -458,7 +458,21 @@ As of 2019-Oct-16: Compressed Sparse Row ([CSR][csr]) and Compressed Sparse Colu
 The actual storage format may be multi objects inside a `h5::gr_t` group, or a single compound data type as a place holder for the indices and actual data. Special structures such as block diagonal, tri diagonal, triangular are not yet supported. Nevertheless will follow BLAS/LAPACK storage layout whenever possible.
 
 
-### The STL
+### The STL and classes implementing the interface
+While it is possible to detect specific STL container instead a broader approach is considered: any class that provides STL like interfaces
+are identified with the detection idoim outlined in paper [WG21 N4421][14]. 
+
+```cpp
+template<class T, class... Args> using is_container = 
+	std::disjunction<
+		is_detected<has_container_t, T>,     // is an adaptor?
+	std::conjunction<                        // or have these properties:
+		is_detected<has_difference_t,T>, 
+		is_detected<has_begin_t,T>, is_detected<has_const_begin_t,T>,
+		is_detected<has_end_t,T>, is_detected<has_const_end_t,T>>
+	>;
+```
+
 From a storage perspective, there are three notable categories:
 
 * `std::vector<T>`, `std::array<T,N>` have `.data()` accessors and H5CPP can directly load/save data from the objects. For efficient partial data transfer the data transfer size must match the element size of the objects.
@@ -468,7 +482,9 @@ don't have direct access to the underlying memory store and the provided iterato
 
 * `std::stack`,`std::queue`,`std::priority_queue` are adaptors; the underlying data-structure determines how data transfers take place.
 
+In addition to the following mapping is considered:
 
+* `vector | array`  of `vector | array` of ... -> `HDF5 ragged/fractal array`
 
 #### std::strings
 
@@ -499,7 +515,7 @@ Currently only memory blocks are supported in consecutive/adjacent location of e
 ```cpp
 my_object obj(100);
 h5::read("file.h5","dataset.dat",obj.ptr(), h5::count{10,10}, h5::offset{100,0});
-``` 
+```
 
 ### Compound Datatypes
 #### POD Struct/Records
@@ -740,7 +756,7 @@ auto fd = h5::create("002.h5", H5F_ACC_TRUNC,
 * [`h5::shared_mesg_nindexes{unsigned}`][1007] Sets number of shared object header message indexes.
 * [`h5::shared_mesg_index{unsigned,unsigned,unsigned}`][1008] Configures the specified shared object header message index.
 * [`h5::shared_mesg_phase_change{unsigned,unsigned}`][1009] Sets shared object header message storage phase change thresholds.
- 
+
 #### [File Access Property List][1020]
 **Example:**
 ```cpp
@@ -811,7 +827,7 @@ h5::fapl_t fapl = h5::fclose_degree_weak | h5::fapl_core{2048,1} | h5::core_writ
 * [`h5::elink_cb{H5L_elink_traverse_t, void*}`][1402] Sets metadata I/O mode for read operations to collective or independent (default).
 * [`h5::elink_fapl{hid_t}`][1403] Sets a file access property list for use in accessing a file pointed to by an external link.
 * [`h5::elink_acc_flags{unsigned}`][1403] Sets the external link traversal file access flag in a link access property list.<br/>
-**Flags:** 	`h5::acc_rdwr`, `h5::acc_rdonly`, `h5::acc_default`
+	**Flags:** 	`h5::acc_rdwr`, `h5::acc_rdonly`, `h5::acc_default`
 
 ## Dataset Operations
 #### [Dataset Creation Property List][1500]
@@ -1151,7 +1167,7 @@ When POD struct are used, the type description  must be sandwiched between the `
 Miscellaneous routines are:
 
 * **compat.hpp** to mitigate differences between C++11 and c++17
-* **H5capi.hpp** to manage error handling 
+* **H5capi.hpp** shim between CAPI calls to C++ 
 * **H5config.hpp** definitions to control H5CPP behaviour
 * **H5cout.hpp** IO stream routines for H5CPP objects, **TODO:** work in progress
 
@@ -1183,7 +1199,7 @@ H5CPP controls what arguments accepted for various functions calls with `std::en
 [11]: https://github.com/isocpp/CppCoreGuidelines/blob/master/CppCoreGuidelines.md#S-errors
 [12]: https://github.com/isocpp/CppCoreGuidelines/blob/master/CppCoreGuidelines.md#Re-exception-types
 [13]: https://en.cppreference.com/w/cpp/language/namespace_alias
-
+[14]: http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2015/n4436.pdf
 
 [99]: https://en.wikipedia.org/wiki/C_(programming_language)#Pointers
 [100]: http://arma.sourceforge.net/
@@ -1274,7 +1290,7 @@ H5CPP controls what arguments accepted for various functions calls with `std::en
 [1104]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetLinkPhaseChange
 
 [1200]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#GroupAccessPropFuncs
-[1201]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetAllCollMetadataOps 
+[1201]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetAllCollMetadataOps
 
 [1300]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#LinkCreatePropFuncs
 [1301]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetCharEncoding
@@ -1288,17 +1304,17 @@ H5CPP controls what arguments accepted for various functions calls with `std::en
 [1405]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetELinkFapl
 [1406]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetELinkAccFlags
 
-[1500]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#DatasetCreatePropFuncs 
+[1500]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#DatasetCreatePropFuncs
 [1501]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetLayout
 [1502]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetChunk
 [1503]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetChunkOpts
-[1504]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetDeflate 
+[1504]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetDeflate
 [1505]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetFillValue
-[1506]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetFillTime 
+[1506]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetFillTime
 [1507]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetAllocTime
-[1508]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetFilter 
+[1508]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetFilter
 [1509]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetFletcher32
-[1510]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetNbit 
+[1510]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetNbit
 [1511]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetScaleoffset
 [1512]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetShuffle
 [1513]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetSzip
@@ -1317,7 +1333,7 @@ H5CPP controls what arguments accepted for various functions calls with `std::en
 [1704]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetDataTransform
 [1705]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetTypeConvCb
 [1706]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetHyperVectorSize
-[1707]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetBTreeRatios 
+[1707]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetBTreeRatios
 [1708]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetVLMemManager
 [1709]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetDxplMpio
 [1710]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetDxplMpioChunkOpt
@@ -1326,7 +1342,7 @@ H5CPP controls what arguments accepted for various functions calls with `std::en
 [1713]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetDxplMpioCollectiveOpt
 
 [1800]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#ObjectCreatePropFuncs
-[1801]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetCreateIntermediateGroup 
+[1801]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetCreateIntermediateGroup
 [1802]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetObjTrackTimes
 [1803]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetAttrPhaseChange
 [1804]: https://support.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-SetAttrCreationOrder

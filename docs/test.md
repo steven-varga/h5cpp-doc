@@ -1,5 +1,5 @@
 # Cartesian Test
-Google Test framawork v1.7.0 provides limited support for cartesian products of test values with `Combine` upto 10 independent cases (see: `gtest-param-test.h`). This restriction is the result of C++11 macro based approach, and is lifted by providing a template meta-programming based C++17 compliant implementation.
+Google Test framework v1.7.0 provides limited support for Cartesian products of test values with `Combine` upto 10 independent cases (see: `gtest-param-test.h`). This restriction is the result of macro based approach, and is lifted by providing a template meta-programming based C++17 compliant implementation.
 
 In `h5cpp-test.hpp` the definition  `#define H5CPP_ALL_TYPES char, short, ... , double` controls what types test cases are iterated through, there is a different type definition for containers, and linear algebra objects. 
 
@@ -46,7 +46,7 @@ public:
 
 In addition to test case assertions there is a general error handler which triggers failure if HDF5 CAPI reports error. Consider this as a fail safe switch to prevent erroneous implementation pass.
 ```
-herr_t CAPI_handler (int n, void *unused) {
+herr_t CAPI_error_handler (long int, void *) {
 	hid_t error_stack = H5Eget_current_stack();
 	H5Eclear( error_stack );
 	ADD_FAILURE();
@@ -73,6 +73,9 @@ cartesian_example                                                     double [  
 PASSED: 10  FAILED: 0 TIME: 3 ms 
 -------------------------------------------------------------------------------------
 ```
+## Mock Functions
+* `std::array<T,N> mock::randu(size_t min, size_t max)` returns an array of T where `T ::= numerical | std::string`
+* `std::tuple<...> mock::data<std::tuple<...>>(size_t min, size_t max, double fill_rate)` return tuple of random length and content of datasets with cardinality specified by `min` and `max`. 
 
 # Prerequisites 
 

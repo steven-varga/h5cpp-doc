@@ -5,7 +5,13 @@
 * integral_types: [bool, char, char16_t, char32_t, wchar_t, short, int, long, long long]
 * floating point: float, double, long double
 
+### Templates
 
+- `h5::rank<T>::value` returns the number of dimensions of all objects recognized by H5CPP.
+
+- `h5::decay<T>type` recusrsively fiinds the element type of an object
+
+- `std::array<size_t,N> h5::size()` runtime call to find out the `rank` and `extents` of an object 
 
 void, std::nullptr: 
 
